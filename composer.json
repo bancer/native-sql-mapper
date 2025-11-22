@@ -1,0 +1,49 @@
+{
+    "name": "bancer/native-sql-mapper",
+    "description": "A small CakePHP ORM-based library for hydrating raw SQL query results into entity graphs.",
+    "type": "library",
+    "require": {
+        "php": ">=7.4.0",
+        "cakephp/database": "^4.0",
+        "cakephp/orm": "^4.0"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.0.0",
+        "phpstan/phpstan-phpunit": "^2.0",
+        "phpunit/phpunit": "^8.5 || ^9.3",
+        "squizlabs/php_codesniffer": "^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Bancer\\NativeQueryMapper\\": "src/"
+        }
+    },
+    "autoload-dev" : {
+        "psr-4" : {
+            "Bancer\\NativeQueryMapperTest\\": "tests/"
+        }
+    },
+    "license": "MIT",
+    "minimum-stability": "stable",
+    "scripts": {
+        "all-tests": [
+            "@phpstan",
+            "@phpcs",
+            "@phpunit"
+        ],
+        "ci-tests": [
+            "@phpstan",
+            "@phpcs",
+            "@phpunit-coverage"
+        ],
+        "phpstan": "vendor/bin/phpstan analyse -c phpstan.neon",
+        "phpcs": "vendor/bin/phpcs --standard=PSR12 -p src tests",
+        "phpunit": "vendor/bin/phpunit tests",
+        "phpunit-coverage": "XDEBUG_MODE=coverage vendor/bin/phpunit tests --coverage-text"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    }
+}
