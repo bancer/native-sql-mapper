@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Bancer\NativeQueryMapper\ORM;
 
-use Cake\Database\StatementInterface;
 use Cake\Datasource\EntityInterface;
 use Cake\ORM\Table;
 use Cake\ORM\Entity;
@@ -141,7 +140,7 @@ class AutoHydratorRecursive
         $results = [];
         $rootAlias = $this->rootTable->getAlias();
         foreach ($rows as $row) {
-            $tree = $this->buildEntityRecursive($this->rootTable, $row, $rootAlias);
+            $tree = $this->buildEntityRecursive($this->rootTable, $row);
             $root = $tree[$rootAlias];
             $key = $this->entityKey($root, $this->rootTable);
             if (!isset($results[$key])) {
@@ -156,14 +155,12 @@ class AutoHydratorRecursive
     /**
      * @param Table $table
      * @param mixed[] $row
-     * @param string $expectedAlias
      * @param mixed[] $visited
      * @return \Cake\Datasource\EntityInterface[]
      */
     protected function buildEntityRecursive(
         Table $table,
         array $row,
-        string $expectedAlias,
         array &$visited = []
     ): array {
         $alias = $table->getAlias();
@@ -203,7 +200,7 @@ class AutoHydratorRecursive
                 continue;
             }
             if ($assoc instanceof HasMany) {
-                $tree = $this->buildEntityRecursive($target, $row, $childAlias, $visited);
+                $tree = $this->buildEntityRecursive($target, $row, $visited);
                 if ($tree) {
                     $list = $entity->get($assoc->getProperty());
                     if (!is_array($list)) {
@@ -216,7 +213,7 @@ class AutoHydratorRecursive
                 continue;
             }
             if ($assoc instanceof BelongsTo || $assoc instanceof HasOne) {
-                $tree = $this->buildEntityRecursive($target, $row, $childAlias, $visited);
+                $tree = $this->buildEntityRecursive($target, $row, $visited);
                 if ($tree) {
                     $entity->set($assoc->getProperty(), $tree[$childAlias]);
                     $out += $tree;
@@ -224,17 +221,17 @@ class AutoHydratorRecursive
                 continue;
             }
             if ($assoc instanceof BelongsToMany) {
-                $junctionAlias = $assoc->getThrough();
-                if (is_object($junctionAlias)) {
-                    $junctionAlias = $junctionAlias->getAlias();
-                }
-                $tree = $this->buildEntityRecursive($target, $row, $childAlias, $visited);
+                $tree = $this->buildEntityRecursive($target, $row, $visited);
                 if ($tree) {
                     $child = $tree[$childAlias];
+                    $junctionAlias = $assoc->getThrough();
+                    if (is_object($junctionAlias)) {
+                        $junctionAlias = $junctionAlias->getAlias();
+                    }
                     // hydrate join data only if the row contains it
-                    if (isset($this->aliasMap[$junctionAlias])) {
+                    if ($junctionAlias !== null && isset($this->aliasMap[$junctionAlias])) {
                         $junctionTable = TableRegistry::getTableLocator()->get($junctionAlias);
-                        $jTree = $this->buildEntityRecursive($junctionTable, $row, $junctionAlias, $visited);
+                        $jTree = $this->buildEntityRecursive($junctionTable, $row, $visited);
                         if ($jTree) {
                             $child->set('_joinData', $jTree[$junctionAlias]);
                             $out += $jTree;
@@ -251,7 +248,7 @@ class AutoHydratorRecursive
                 continue;
             }
             // fallback
-            $tree = $this->buildEntityRecursive($target, $row, $childAlias, $visited);
+            $tree = $this->buildEntityRecursive($target, $row, $visited);
             if ($tree) {
                 $entity->set($assoc->getProperty(), $tree[$childAlias]);
                 $out += $tree;

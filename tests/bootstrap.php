@@ -17,6 +17,7 @@ ConnectionManager::setConfig('test', [
 ]);
 ConnectionManager::alias('test', 'default');
 
+/** @var \Cake\Database\Connection $connection */
 $connection = ConnectionManager::get('test');
 
 $connection->execute("
