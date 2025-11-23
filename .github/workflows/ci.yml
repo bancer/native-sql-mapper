@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.1
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          tools: composer
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction
+
+      - name: Run PHPStan
+        run: composer phpstan
+
+      - name: Run PHPCS
+        run: composer phpcs
+
+  phpunit:
+    name: PHPUnit (PHP ${{ matrix.php }} + ORM ${{ matrix.orm }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ORM 4 requires PHP >= 7.2
+          - { php: '7.4', orm: '4' }
+          - { php: '8.0', orm: '4' }
+          - { php: '8.1', orm: '4' }
+          - { php: '8.2', orm: '4' }
+          - { php: '8.3', orm: '4' }
+          - { php: '8.4', orm: '4' }
+
+          # ORM 5 requires PHP >= 8.1
+          - { php: '8.1', orm: '5' }
+          - { php: '8.2', orm: '5' }
+          - { php: '8.3', orm: '5' }
+          - { php: '8.4', orm: '5' }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer
+
+      - name: Install base dependencies
+        run: composer install --prefer-dist --no-interaction
+
+      - name: Require CakePHP ORM version
+        run: composer require "cakephp/orm:^${{ matrix.orm }}" "cakephp/database:^${{ matrix.orm }}" --no-interaction --no-update
+
+      - name: Update dependencies
+        run: composer update --prefer-dist --no-interaction
+
+      - name: Run PHPUnit
+        run: composer phpunit-coverage
