@@ -16,7 +16,10 @@
     "autoload": {
         "psr-4": {
             "Bancer\\NativeQueryMapper\\": "src/"
-        }
+        },
+        "files": [
+            "src/polyfill_str_contains.php"
+        ]
     },
     "autoload-dev" : {
         "psr-4" : {

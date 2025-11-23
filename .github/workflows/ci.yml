@@ -34,8 +34,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ['7.4', '8.0']
-        orm: ['4', '5']
+        include:
+          # ORM 4 requires PHP >= 7.2
+          - { php: '7.2', orm: '4' }
+          - { php: '7.4', orm: '4' }
+          - { php: '8.0', orm: '4' }
+          - { php: '8.1', orm: '4' }
+          - { php: '8.2', orm: '4' }
+          - { php: '8.3', orm: '4' }
+          - { php: '8.4', orm: '4' }
+
+          # ORM 5 requires PHP >= 8.1
+          - { php: '8.1', orm: '5' }
+          - { php: '8.2', orm: '5' }
+          - { php: '8.3', orm: '5' }
+          - { php: '8.4', orm: '5' }
 
     steps:
       - uses: actions/checkout@v4
@@ -46,10 +59,10 @@ jobs:
           php-version: ${{ matrix.php }}
           tools: composer
 
-      - name: Install dependencies
+      - name: Install base dependencies
         run: composer install --prefer-dist --no-interaction
 
-      - name: Require ORM version
+      - name: Require CakePHP ORM version
         run: composer require "cakephp/orm:^${{ matrix.orm }}" "cakephp/database:^${{ matrix.orm }}" --no-interaction --no-update
 
       - name: Update dependencies
