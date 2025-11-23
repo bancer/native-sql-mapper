@@ -15,13 +15,27 @@ use Cake\ORM\Association\BelongsToMany;
 
 class AutoHydratorRecursive
 {
+    /**
+     * A list of uknown aliases.
+     *
+     * @var string[]
+     */
+    private array $unknownAliases = [];
+
     protected Table $rootTable;
 
-    /** @var array<string,string[]> */
+    /** @var array<string,string[]> SQL alias => fields */
     protected array $aliasMap = [];
 
-    /** @var array<string,Table> */
+    /** @var array<string,Table> SQL alias => Table instance */
     protected array $tableByAlias = [];
+
+    /**
+     * Precomputed mapping strategy.
+     *
+     * @var array<string, mixed[]>
+     */
+    protected array $mappingStrategy = [];
 
     /**
      * @param Table $rootTable
@@ -36,7 +50,9 @@ class AutoHydratorRecursive
         }
         $keys = array_keys($first);
         $this->aliasMap = $this->buildAliasMapFromRowKeys($keys);
-        $this->validateAndResolveAliases();
+        $allAliases = array_keys($this->aliasMap);
+        $this->unknownAliases = array_combine($allAliases, $allAliases);
+        $this->buildMappingStrategy();
     }
 
     /**
@@ -59,15 +75,19 @@ class AutoHydratorRecursive
         return $map;
     }
 
-    protected function validateAndResolveAliases(): void
+    /**
+     * Precompute mapping strategy and resolve table aliases.
+     */
+    protected function buildMappingStrategy(): void
     {
         $rootAlias = $this->rootTable->getAlias();
         $this->tableByAlias[$rootAlias] = $this->rootTable;
+        $this->mappingStrategy = [];
         foreach ($this->aliasMap as $alias => $_fields) {
             if ($alias === $rootAlias) {
                 continue;
             }
-            $table = $this->resolveTableByAlias($alias);
+            $table = $this->resolveTableByAliasRecursive($alias);
             if ($table === null) {
                 throw new UnknownAliasException(
                     "SQL alias '$alias' does not match any reachable Table from '$rootAlias'."
@@ -75,6 +95,54 @@ class AutoHydratorRecursive
             }
             $this->tableByAlias[$alias] = $table;
         }
+        $allAliases = array_keys($this->aliasMap);
+        $aliasesToMap = array_combine($allAliases, $allAliases);
+        foreach ($this->tableByAlias as $alias => $table) {
+            if (isset($aliasesToMap[$alias])) {
+                $this->mappingStrategy[$alias] = [];
+                foreach ($table->associations() as $assoc) {
+                    $type = null;
+                    if ($assoc instanceof HasOne) {
+                        $type = 'hasOne';
+                    } elseif ($assoc instanceof BelongsTo) {
+                        $type = 'belongsTo';
+                    } elseif ($assoc instanceof BelongsToMany) {
+                        $type = 'belongsToMany';
+                    } elseif ($assoc instanceof HasMany) {
+                        $type = 'hasMany';
+                    }
+                    if ($type === null) {
+                        continue;
+                    }
+                    $childAlias = $assoc->getTarget()->getAlias();
+                    if (!isset($aliasesToMap[$childAlias])) {
+                        continue;
+                    }
+                    $entry = [];
+                    if ($assoc instanceof BelongsToMany) {
+                        $through = $assoc->getThrough();
+                        if ($through === null) {
+                            $through = $assoc->junction();
+                        }
+                        if (is_object($through)) {
+                            $through = $through->getAlias();
+                        }
+                        $entry['through'] = $through;
+                        if (isset($aliasesToMap[$through])) {
+                            unset($aliasesToMap[$through]);
+                        }
+                    }
+                    $entry['property'] = $assoc->getProperty();
+                    $this->mappingStrategy[$alias][$type][$childAlias] = $entry;
+                    unset($aliasesToMap[$childAlias]);
+                }
+            }
+        }
+    }
+
+    protected function resolveTableByAlias(string $alias): ?Table
+    {
+        return $this->tableByAlias[$alias] ?? null;
     }
 
     /**
@@ -92,37 +160,40 @@ class AutoHydratorRecursive
      * @param string $alias The SQL alias to resolve.
      * @return \Cake\ORM\Table|null The Table instance corresponding to the alias, or null if not found.
      */
-    protected function resolveTableByAlias(string $alias): ?Table
+    protected function resolveTableByAliasRecursive(string $alias): ?Table
     {
-        if (isset($this->tableByAlias[$alias])) {
-            return $this->tableByAlias[$alias];
-        }
         $visited = [];
         $queue = [$this->rootTable];
-        while ($queue) {
+        while ($queue && !empty($this->unknownAliases)) {
             /** @var Table $table */
             $table = array_shift($queue);
             $visited[$table->getAlias()] = true;
             foreach ($table->associations() as $assoc) {
                 $target = $assoc->getTarget();
                 $ta = $target->getAlias();
-                if ($ta === $alias) {
-                    return $target;
+                if (isset($this->unknownAliases[$ta])) {
+                    unset($this->unknownAliases[$ta]);
+                    if ($ta === $alias) {
+                        return $target;
+                    }
                 }
                 if (!isset($visited[$ta])) {
                     $queue[] = $target;
                 }
                 if ($assoc instanceof BelongsToMany) {
-                    $junctionAlias = $assoc->getThrough();
-                    if ($junctionAlias) {
-                        if (is_object($junctionAlias)) {
-                            $junctionAlias = $junctionAlias->getAlias();
+                    $through = $assoc->getThrough();
+                    if ($through !== null) {
+                        if (is_object($through)) {
+                            $through = $through->getAlias();
                         }
-                        if ($junctionAlias === $alias) {
-                            return TableRegistry::getTableLocator()->get($junctionAlias);
+                        if (isset($this->unknownAliases[$through])) {
+                            unset($this->unknownAliases[$through]);
+                            if ($through === $alias) {
+                                return TableRegistry::getTableLocator()->get($through);
+                            }
                         }
-                        if (!isset($visited[$junctionAlias])) {
-                            $queue[] = TableRegistry::getTableLocator()->get($junctionAlias);
+                        if (!isset($visited[$through])) {
+                            $queue[] = TableRegistry::getTableLocator()->get($through);
                         }
                     }
                 }
@@ -187,71 +258,53 @@ class AutoHydratorRecursive
             ]
         );
         $out[$alias] = $entity;
-        foreach ($table->associations() as $assoc) {
-            $target = $assoc->getTarget();
-            $childAlias = $target->getAlias();
-            if (
-                !isset($this->aliasMap[$childAlias]) &&
-                !(
-                    $assoc instanceof BelongsToMany &&
-                    isset($this->aliasMap[$assoc->junction()->getAlias()])
-                )
-            ) {
-                continue;
-            }
-            if ($assoc instanceof HasMany) {
-                $tree = $this->buildEntityRecursive($target, $row, $visited);
-                if ($tree) {
-                    $list = $entity->get($assoc->getProperty());
-                    if (!is_array($list)) {
-                        $list = [];
+        foreach ($this->mappingStrategy[$alias] ?? [] as $type => $children) {
+            if (is_array($children)) {
+                foreach ($children as $childAlias => $assocData) {
+                    if (!isset($this->aliasMap[$childAlias])) {
+                        continue;
                     }
-                    $list[] = $tree[$childAlias];
-                    $entity->set($assoc->getProperty(), $list);
-                    $out += $tree;
-                }
-                continue;
-            }
-            if ($assoc instanceof BelongsTo || $assoc instanceof HasOne) {
-                $tree = $this->buildEntityRecursive($target, $row, $visited);
-                if ($tree) {
-                    $entity->set($assoc->getProperty(), $tree[$childAlias]);
-                    $out += $tree;
-                }
-                continue;
-            }
-            if ($assoc instanceof BelongsToMany) {
-                $tree = $this->buildEntityRecursive($target, $row, $visited);
-                if ($tree) {
-                    $child = $tree[$childAlias];
-                    $junctionAlias = $assoc->getThrough();
-                    if (is_object($junctionAlias)) {
-                        $junctionAlias = $junctionAlias->getAlias();
+                    $childTable = $this->tableByAlias[$childAlias];
+                    $tree = $this->buildEntityRecursive($childTable, $row, $visited);
+                    if (!$tree) {
+                        continue;
                     }
-                    // hydrate join data only if the row contains it
-                    if ($junctionAlias !== null && isset($this->aliasMap[$junctionAlias])) {
-                        $junctionTable = TableRegistry::getTableLocator()->get($junctionAlias);
-                        $jTree = $this->buildEntityRecursive($junctionTable, $row, $visited);
-                        if ($jTree) {
-                            $child->set('_joinData', $jTree[$junctionAlias]);
-                            $out += $jTree;
+                    $childEntity = $tree[$childAlias];
+                    if ($type === 'belongsToMany') {
+                        $throughAlias = null;
+                        if (is_array($assocData) && isset($assocData['through'])) {
+                            $throughAlias = $assocData['through'];
+                        }
+                        if (is_string($throughAlias) && isset($this->aliasMap[$throughAlias])) {
+                            $throughTable = $this->tableByAlias[$throughAlias];
+                            $jTree = $this->buildEntityRecursive($throughTable, $row, $visited);
+                            if ($jTree) {
+                                $childEntity->set('_joinData', [$jTree[$throughAlias]]);
+                                $out += $jTree;
+                            }
                         }
                     }
-                    $list = $entity->get($assoc->getProperty());
-                    if (!is_array($list)) {
-                        $list = [];
+                    $prop = null;
+                    if (is_array($assocData) && isset($assocData['property'])) {
+                        $prop = $assocData['property'];
                     }
-                    $list[] = $child;
-                    $entity->set($assoc->getProperty(), $list);
+                    if ($type === 'hasMany' || $type === 'belongsToMany') {
+                        if (!is_string($prop)) {
+                            $prop = $childAlias;
+                        }
+                        $list = $entity->get($prop);
+                        if (!is_array($list)) {
+                            $list = [];
+                        }
+                        $list[] = $childEntity;
+                        $entity->set($prop, $list);
+                    } else {
+                        if (is_string($prop)) {
+                            $entity->set($prop, $childEntity);
+                        }
+                    }
                     $out += $tree;
                 }
-                continue;
-            }
-            // fallback
-            $tree = $this->buildEntityRecursive($target, $row, $visited);
-            if ($tree) {
-                $entity->set($assoc->getProperty(), $tree[$childAlias]);
-                $out += $tree;
             }
         }
         unset($visited[$alias]);

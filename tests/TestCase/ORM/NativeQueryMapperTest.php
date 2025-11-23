@@ -178,7 +178,6 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-        //print_r($ArticlesTable->find()->contain(['Tags'])->enableHydration(false)->toArray());
         $stmt = $ArticlesTable->prepareSQL("
             SELECT
                 Articles.id AS Articles__id,
@@ -209,6 +208,63 @@ class NativeQueryMapperTest extends TestCase
                 [
                     'id' => 2,
                     'name' => 'Food',
+                ],
+            ],
+        ];
+        static::assertSame($expected, $actual[0]->toArray());
+    }
+
+    public function testBelongsToManyFetchJoinTable(): void
+    {
+        /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
+        $ArticlesTable = $this->fetchTable(ArticlesTable::class);
+        $stmt = $ArticlesTable->prepareSQL("
+            SELECT
+                Articles.id AS Articles__id,
+                Articles.title AS Articles__title,
+                Tags.id AS Tags__id,
+                Tags.name AS Tags__name,
+                ArticlesTags.id AS ArticlesTags__id,
+                ArticlesTags.article_id AS ArticlesTags__article_id,
+                ArticlesTags.tag_id AS ArticlesTags__tag_id
+            FROM articles AS Articles
+            LEFT JOIN articles_tags AS ArticlesTags
+                ON Articles.id=ArticlesTags.article_id
+            LEFT JOIN tags AS Tags
+                ON Tags.id=ArticlesTags.tag_id
+        ");
+        $actual = $ArticlesTable->fromNativeQuery($stmt)->all();
+        static::assertCount(5, $actual);
+        static::assertInstanceOf(Article::class, $actual[0]);
+        $actualTags = $actual[0]->get('tags');
+        static::assertIsArray($actualTags);
+        static::assertCount(2, $actualTags);
+        static::assertInstanceOf(Tag::class, $actualTags[0]);
+        $expected = [
+            'id' => 1,
+            'title' => 'Article 1',
+            'tags' => [
+                [
+                    'id' => 1,
+                    'name' => 'Tech',
+                    '_joinData' => [
+                        [
+                            'id' => 1,
+                            'article_id' => 1,
+                            'tag_id' => 1,
+                        ],
+                    ],
+                ],
+                [
+                    'id' => 2,
+                    'name' => 'Food',
+                    '_joinData' => [
+                        [
+                            'id' => 2,
+                            'article_id' => 1,
+                            'tag_id' => 2,
+                        ],
+                    ],
                 ],
             ],
         ];
