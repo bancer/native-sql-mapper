@@ -20,10 +20,26 @@ class NativeQueryMapperTest extends TestCase
 {
     use LocatorAwareTrait;
 
+    /**
+     * @param \Cake\Datasource\EntityInterface[] $expected
+     * @param \Cake\Datasource\EntityInterface[] $actual
+     */
+    private function assertEqualsEntities(array $expected, array $actual): void
+    {
+        $expectedCount = count($expected);
+        $actualCount = count($actual);
+        static::assertSame($expectedCount, $actualCount);
+        for ($i = 0; $i < $actualCount; $i++) {
+            $message = "Entities at index $i are not equal";
+            //static::assertEquals($expected[$i], $actual[$i], $message);
+            static::assertEquals($expected[$i]->toArray(), $actual[$i]->toArray(), $message);
+        }
+    }
+
     public function testInvalidAlias(): void
     {
         $this->expectException(UnknownAliasException::class);
-        $this->expectExceptionMessage("SQL alias 'a' does not match any reachable Table from 'Articles'");
+        $this->expectExceptionMessage("The query must use root table alias 'Articles'");
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
         $stmt = $ArticlesTable->prepareSQL("
@@ -69,6 +85,11 @@ class NativeQueryMapperTest extends TestCase
             'title' => 'Article 1',
         ];
         static::assertSame($expected, $actual[0]->toArray());
+        $cakeEntities = $ArticlesTable->find()
+            ->select(['id', 'title'])
+            ->toArray();
+        $this->assertEqualsEntities($cakeEntities, $actual);
+        //static::assertEquals($cakeEntities, $actual);
     }
 
     public function testSelectHasMany(): void
@@ -110,6 +131,16 @@ class NativeQueryMapperTest extends TestCase
             ],
         ];
         static::assertSame($expected, $actual[0]->toArray());
+        $cakeEntities = $ArticlesTable->find()
+            ->select(['Articles.id', 'Articles.title'])
+            ->contain([
+                'Comments' => [
+                    'fields' => ['Comments.id', 'Comments.article_id', 'Comments.content'],
+                ],
+            ])
+            ->toArray();
+        $this->assertEqualsEntities($cakeEntities, $actual);
+        //static::assertEquals($cakeEntities, $actual);
     }
 
     public function testSelectBelongsTo(): void
@@ -140,7 +171,17 @@ class NativeQueryMapperTest extends TestCase
                 'title' => 'Article 1',
             ],
         ];
+        $cakeEntities = $CommentsTable->find()
+            ->select(['Comments.id', 'Comments.article_id', 'Comments.content'])
+            ->contain([
+                'Articles' => [
+                    'fields' => ['Articles.id', 'Articles.title'],
+                ],
+            ])
+            ->toArray();
         static::assertSame($expected, $actual[0]->toArray());
+        $this->assertEqualsEntities($cakeEntities, $actual);
+        //static::assertEquals($cakeEntities, $actual);
     }
 
     public function testHasOne(): void
@@ -172,9 +213,20 @@ class NativeQueryMapperTest extends TestCase
             ],
         ];
         static::assertSame($expected, $actual[0]->toArray());
+        $cakeEntities = $UsersTable->find()
+            ->select(['Users.id', 'Users.username'])
+            ->contain([
+                'Profiles' => [
+                    'fields' => ['Profiles.id', 'Profiles.user_id', 'Profiles.bio'],
+                ],
+            ])
+            ->toArray();
+        static::assertSame($expected, $actual[0]->toArray());
+        $this->assertEqualsEntities($cakeEntities, $actual);
+        //static::assertEquals($cakeEntities, $actual);
     }
 
-    public function testBelongsToMany(): void
+    public function testBelongsToManySimple(): void
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
@@ -212,6 +264,17 @@ class NativeQueryMapperTest extends TestCase
             ],
         ];
         static::assertSame($expected, $actual[0]->toArray());
+        /*$cakeEntities = $ArticlesTable->find()
+            ->select(['Articles.id', 'Articles.title'])
+            ->contain([
+                'Tags' => [
+                    'fields' => ['Tags.id', 'Tags.name'],
+                ],
+            ])
+            ->toArray();
+        static::assertSame($expected, $actual[0]->toArray());
+        $this->assertEqualsEntities($cakeEntities, $actual);
+        static::assertEquals($cakeEntities, $actual);*/
     }
 
     public function testBelongsToManyFetchJoinTable(): void
@@ -247,27 +310,37 @@ class NativeQueryMapperTest extends TestCase
                 [
                     'id' => 1,
                     'name' => 'Tech',
-                    '_joinData' => [
-                        [
-                            'id' => 1,
-                            'article_id' => 1,
-                            'tag_id' => 1,
-                        ],
+                    'articles_tag' => [
+                        'id' => 1,
+                        'article_id' => 1,
+                        'tag_id' => 1,
                     ],
                 ],
                 [
                     'id' => 2,
                     'name' => 'Food',
-                    '_joinData' => [
-                        [
-                            'id' => 2,
-                            'article_id' => 1,
-                            'tag_id' => 2,
-                        ],
+                    'articles_tag' => [
+                        'id' => 2,
+                        'article_id' => 1,
+                        'tag_id' => 2,
                     ],
                 ],
             ],
         ];
         static::assertSame($expected, $actual[0]->toArray());
+        /*$cakeEntities = $ArticlesTable->find()
+            ->select(['Articles.id', 'Articles.title'])
+            ->contain([
+                'Tags' => [
+                    'fields' => ['Tags.id', 'Tags.name'],
+                    'ArticlesTags' => [
+                        'fields' => ['ArticlesTags.id', 'ArticlesTags.article_id', 'ArticlesTags.tag_id'],
+                    ],
+                ],
+            ])
+            ->toArray();
+        static::assertSame($cakeEntities[0]->toArray(), $actual[0]->toArray());
+        $this->assertEqualsEntities($cakeEntities, $actual);
+        static::assertEquals($cakeEntities, $actual);*/
     }
 }

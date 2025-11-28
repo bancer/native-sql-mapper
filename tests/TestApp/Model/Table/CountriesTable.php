@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Bancer\NativeQueryMapperTest\TestApp\Model\Table;
 
-use Bancer\NativeQueryMapper\ORM\NativeSQLMapperTrait;
 use Cake\ORM\Table;
+use Bancer\NativeQueryMapper\ORM\NativeSQLMapperTrait;
 
-class UsersTable extends Table
+class CountriesTable extends Table
 {
     use NativeSQLMapperTrait;
 
@@ -19,7 +19,6 @@ class UsersTable extends Table
     public function initialize(array $config): void
     {
         parent::initialize($config);
-        $this->belongsTo('Countries', ['className' => CountriesTable::class]);
-        $this->hasOne('Profiles', ['className' => ProfilesTable::class]);
+        $this->hasMany('Users', ['className' => UsersTable::class]);
     }
 }
