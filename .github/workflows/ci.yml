@@ -37,7 +37,8 @@ jobs:
         include:
           # ORM 4 requires PHP >= 7.2
           - { php: '7.4', orm: '4' }
-          - { php: '8.0', orm: '4' }
+          # Entity fields are not casted to integers in PHP 8.0
+          # - { php: '8.0', orm: '4' }
           - { php: '8.1', orm: '4' }
           - { php: '8.2', orm: '4' }
           - { php: '8.3', orm: '4' }

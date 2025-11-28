@@ -193,13 +193,18 @@ class MappingStrategy
      */
     private function assocType(Association $assoc): ?string
     {
-        return match (true) {
-            $assoc instanceof HasOne        => 'hasOne',
-            $assoc instanceof BelongsTo     => 'belongsTo',
-            $assoc instanceof BelongsToMany => 'belongsToMany',
-            $assoc instanceof HasMany       => 'hasMany',
-            default => null,
-        };
+        $map = [
+            HasOne::class        => 'hasOne',
+            BelongsTo::class     => 'belongsTo',
+            BelongsToMany::class => 'belongsToMany',
+            HasMany::class       => 'hasMany',
+        ];
+        foreach ($map as $class => $type) {
+            if ($assoc instanceof $class) {
+                return $type;
+            }
+        }
+        return null;
     }
 
     /**
