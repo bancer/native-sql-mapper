@@ -4,202 +4,90 @@ declare(strict_types=1);
 
 namespace Bancer\NativeQueryMapper\ORM;
 
-use Cake\Datasource\EntityInterface;
 use Cake\ORM\Table;
-use Cake\ORM\Entity;
-use Cake\ORM\TableRegistry;
-use Cake\ORM\Association\HasMany;
-use Cake\ORM\Association\HasOne;
-use Cake\ORM\Association\BelongsTo;
-use Cake\ORM\Association\BelongsToMany;
+use Cake\Datasource\EntityInterface;
 
 class AutoHydratorRecursive
 {
+    protected Table $rootTable;
+
     /**
-     * A list of uknown aliases.
-     *
      * @var string[]
      */
-    private array $unknownAliases = [];
+    protected array $associationTypes = [
+        'hasOne',
+        'belongsTo',
+        'hasMany',
+        'belongsToMany',
+    ];
 
-    protected Table $rootTable;
+    /**
+     * @var string[]
+     */
+    protected array $aliases;
 
     /** @var array<string,string[]> SQL alias => fields */
     protected array $aliasMap = [];
 
-    /** @var array<string,Table> SQL alias => Table instance */
-    protected array $tableByAlias = [];
-
     /**
      * Precomputed mapping strategy.
      *
-     * @var array<string, mixed[]>
+     * @var mixed[]
      */
     protected array $mappingStrategy = [];
 
     /**
-     * @param Table $rootTable
-     * @param mixed[] $rows
+     * [
+     *    '{alias}' => [
+     *        '{hash}' => {index},
+     *    ],
+     * ]
+     *
+     * @var int[][]
+     */
+    protected array $entitiesMap = [];
+
+    /**
+     * @var \Cake\Datasource\EntityInterface[]
+     */
+    protected array $entities = [];
+
+    /**
+     * @param \Cake\ORM\Table $rootTable
+     * @param mixed[] $rows The result set of `$this->stmt->fetchAll(\PDO::FETCH_ASSOC);`.
      */
     public function __construct(Table $rootTable, array $rows)
     {
         $this->rootTable = $rootTable;
-        $first = $rows[0] ?? [];
-        if (!is_array($first)) {
+        $firstRow = $rows[0] ?? [];
+        if (!is_array($firstRow)) {
             throw new \InvalidArgumentException('First element of the result set is not an array');
         }
-        $keys = array_keys($first);
-        $this->aliasMap = $this->buildAliasMapFromRowKeys($keys);
-        $allAliases = array_keys($this->aliasMap);
-        $this->unknownAliases = array_combine($allAliases, $allAliases);
-        $this->buildMappingStrategy();
+        $keys = array_keys($firstRow);
+        $this->aliasMap = $this->buildAliasMap($keys);
+        $this->aliases = array_keys($this->aliasMap);
+        $strategy = new MappingStrategy($rootTable, $this->aliases);
+        $this->mappingStrategy = $strategy->build()->toArray();
     }
 
     /**
-     * @param (int|string)[] $keys
+     * @param (string|null)[] $keys
      * @return string[][]
      */
-    protected function buildAliasMapFromRowKeys(array $keys): array
+    protected function buildAliasMap(array $keys): array
     {
         $map = [];
-        foreach ($keys as $k) {
-            if (!is_string($k)) {
-                throw new UnknownAliasException('SQL alias is not a string');
+        foreach ($keys as $key) {
+            if (!is_string($key) || !str_contains($key, '__')) {
+                throw new UnknownAliasException("Alias '$key' is invalid");
             }
-            if (!str_contains($k, '__')) {
-                continue;
+            [$alias, $field] = explode('__', $key, 2);
+            if (mb_strlen($alias) <= 0 || mb_strlen($field) <= 0) {
+                throw new UnknownAliasException("Alias '$key' is invalid");
             }
-            [$alias, $field] = explode('__', $k, 2);
             $map[$alias][] = $field;
         }
         return $map;
-    }
-
-    /**
-     * Precompute mapping strategy and resolve table aliases.
-     */
-    protected function buildMappingStrategy(): void
-    {
-        $rootAlias = $this->rootTable->getAlias();
-        $this->tableByAlias[$rootAlias] = $this->rootTable;
-        $this->mappingStrategy = [];
-        foreach ($this->aliasMap as $alias => $_fields) {
-            if ($alias === $rootAlias) {
-                continue;
-            }
-            $table = $this->resolveTableByAliasRecursive($alias);
-            if ($table === null) {
-                throw new UnknownAliasException(
-                    "SQL alias '$alias' does not match any reachable Table from '$rootAlias'."
-                );
-            }
-            $this->tableByAlias[$alias] = $table;
-        }
-        $allAliases = array_keys($this->aliasMap);
-        $aliasesToMap = array_combine($allAliases, $allAliases);
-        foreach ($this->tableByAlias as $alias => $table) {
-            if (isset($aliasesToMap[$alias])) {
-                $this->mappingStrategy[$alias] = [];
-                foreach ($table->associations() as $assoc) {
-                    $type = null;
-                    if ($assoc instanceof HasOne) {
-                        $type = 'hasOne';
-                    } elseif ($assoc instanceof BelongsTo) {
-                        $type = 'belongsTo';
-                    } elseif ($assoc instanceof BelongsToMany) {
-                        $type = 'belongsToMany';
-                    } elseif ($assoc instanceof HasMany) {
-                        $type = 'hasMany';
-                    }
-                    if ($type === null) {
-                        continue;
-                    }
-                    $childAlias = $assoc->getTarget()->getAlias();
-                    if (!isset($aliasesToMap[$childAlias])) {
-                        continue;
-                    }
-                    $entry = [];
-                    if ($assoc instanceof BelongsToMany) {
-                        $through = $assoc->getThrough();
-                        if ($through === null) {
-                            $through = $assoc->junction();
-                        }
-                        if (is_object($through)) {
-                            $through = $through->getAlias();
-                        }
-                        $entry['through'] = $through;
-                        if (isset($aliasesToMap[$through])) {
-                            unset($aliasesToMap[$through]);
-                        }
-                    }
-                    $entry['property'] = $assoc->getProperty();
-                    $this->mappingStrategy[$alias][$type][$childAlias] = $entry;
-                    unset($aliasesToMap[$childAlias]);
-                }
-            }
-        }
-    }
-
-    protected function resolveTableByAlias(string $alias): ?Table
-    {
-        return $this->tableByAlias[$alias] ?? null;
-    }
-
-    /**
-     * Resolves a table instance based on a given SQL alias.
-     *
-     * This method performs a breadth-first search (BFS) starting from the root table
-     * to find a table that matches the provided alias. It traverses all associations
-     * (HasOne, HasMany, BelongsTo, BelongsToMany) recursively and also considers
-     * junction tables for BelongsToMany associations.
-     *
-     * For BelongsToMany associations, the junction table is only enqueued if it exists
-     * and is not already visited. If the alias matches a junction table, the method
-     * retrieves it from the TableLocator.
-     *
-     * @param string $alias The SQL alias to resolve.
-     * @return \Cake\ORM\Table|null The Table instance corresponding to the alias, or null if not found.
-     */
-    protected function resolveTableByAliasRecursive(string $alias): ?Table
-    {
-        $visited = [];
-        $queue = [$this->rootTable];
-        while ($queue && !empty($this->unknownAliases)) {
-            /** @var Table $table */
-            $table = array_shift($queue);
-            $visited[$table->getAlias()] = true;
-            foreach ($table->associations() as $assoc) {
-                $target = $assoc->getTarget();
-                $ta = $target->getAlias();
-                if (isset($this->unknownAliases[$ta])) {
-                    unset($this->unknownAliases[$ta]);
-                    if ($ta === $alias) {
-                        return $target;
-                    }
-                }
-                if (!isset($visited[$ta])) {
-                    $queue[] = $target;
-                }
-                if ($assoc instanceof BelongsToMany) {
-                    $through = $assoc->getThrough();
-                    if ($through !== null) {
-                        if (is_object($through)) {
-                            $through = $through->getAlias();
-                        }
-                        if (isset($this->unknownAliases[$through])) {
-                            unset($this->unknownAliases[$through]);
-                            if ($through === $alias) {
-                                return TableRegistry::getTableLocator()->get($through);
-                            }
-                        }
-                        if (!isset($visited[$through])) {
-                            $queue[] = TableRegistry::getTableLocator()->get($through);
-                        }
-                    }
-                }
-            }
-        }
-        return null;
     }
 
     /**
@@ -208,172 +96,173 @@ class AutoHydratorRecursive
      */
     public function hydrateMany(array $rows): array
     {
-        $results = [];
-        $rootAlias = $this->rootTable->getAlias();
-        foreach ($rows as $row) {
-            $tree = $this->buildEntityRecursive($this->rootTable, $row);
-            $root = $tree[$rootAlias];
-            $key = $this->entityKey($root, $this->rootTable);
-            if (!isset($results[$key])) {
-                $results[$key] = $root;
-            } else {
-                $this->mergeEntityCollections($results[$key], $root);
-            }
+        $parsed = $this->parse($rows);
+        foreach ($parsed as $row) {
+            $this->map($this->mappingStrategy, $row);
         }
-        return array_values($results);
+        return $this->entities;
     }
 
     /**
-     * @param Table $table
-     * @param mixed[] $row
-     * @param mixed[] $visited
-     * @return \Cake\Datasource\EntityInterface[]
+     *
+     * @param mixed[] $mappingStrategy
+     * @param mixed[][] $row
+     * @param \Cake\Datasource\EntityInterface $parent
+     * @param string $parentAssociation
      */
-    protected function buildEntityRecursive(
-        Table $table,
+    protected function map(
+        array $mappingStrategy,
         array $row,
-        array &$visited = []
-    ): array {
-        $alias = $table->getAlias();
-        // prevent infinite recursion
-        if (isset($visited[$alias])) {
-            return [];
-        }
-        $visited[$alias] = true;
-        $out = [];
-        if (!isset($this->aliasMap[$alias])) {
-            unset($visited[$alias]);
-            return [];
-        }
-        $data = [];
-        foreach ($this->aliasMap[$alias] as $field) {
-            $data[$field] = $row["{$alias}__{$field}"] ?? null;
-        }
-        $entity = $table->newEntity(
-            $data,
-            [
-                'associated' => [],
-                'markNew' => false,
-                'accessibleFields' => ['*' => true],
-            ]
-        );
-        $out[$alias] = $entity;
-        foreach ($this->mappingStrategy[$alias] ?? [] as $type => $children) {
-            if (is_array($children)) {
-                foreach ($children as $childAlias => $assocData) {
-                    if (!isset($this->aliasMap[$childAlias])) {
-                        continue;
+        ?EntityInterface $parent = null,
+        ?string $parentAssociation = null
+    ): void {
+        /** @var array{
+         *      className?: class-string<\Cake\Datasource\EntityInterface>,
+         *      propertyName?: string,
+         *      hasOne?: array<string, mixed[]>,
+         *      belongsTo?: array<string, mixed[]>,
+         *      hasMany?: array<string, mixed[]>,
+         *      belongsToMany?: array<string, mixed[]>
+         *  } $node */
+        foreach ($mappingStrategy as $alias => $node) {
+            if (!isset($node['className'])) {
+                throw new \RuntimeException("Unknown entity class name for alias $alias");
+            }
+            $className = $node['className'];
+            if ($parent === null) {
+                // root entity
+                $hash = $this->computeFieldsHash($row[$alias]);
+                if (!isset($this->entitiesMap[$alias][$hash])) {
+                    // create new entity
+                    $entity = $this->constructEntity($className, $row[$alias]);
+                    if ($entity === null) {
+                        throw new \RuntimeException('Failed to construct root entity');
                     }
-                    $childTable = $this->tableByAlias[$childAlias];
-                    $tree = $this->buildEntityRecursive($childTable, $row, $visited);
-                    if (!$tree) {
-                        continue;
-                    }
-                    $childEntity = $tree[$childAlias];
-                    if ($type === 'belongsToMany') {
-                        $throughAlias = null;
-                        if (is_array($assocData) && isset($assocData['through'])) {
-                            $throughAlias = $assocData['through'];
-                        }
-                        if (is_string($throughAlias) && isset($this->aliasMap[$throughAlias])) {
-                            $throughTable = $this->tableByAlias[$throughAlias];
-                            $jTree = $this->buildEntityRecursive($throughTable, $row, $visited);
-                            if ($jTree) {
-                                $childEntity->set('_joinData', [$jTree[$throughAlias]]);
-                                $out += $jTree;
-                            }
-                        }
-                    }
-                    $prop = null;
-                    if (is_array($assocData) && isset($assocData['property'])) {
-                        $prop = $assocData['property'];
-                    }
-                    if ($type === 'hasMany' || $type === 'belongsToMany') {
-                        if (!is_string($prop)) {
-                            $prop = $childAlias;
-                        }
-                        $list = $entity->get($prop);
-                        if (!is_array($list)) {
-                            $list = [];
-                        }
-                        $list[] = $childEntity;
-                        $entity->set($prop, $list);
+                    $this->entities[] = $entity;
+                    $this->entitiesMap[$alias][$hash] = array_key_last($this->entities);
+                } else {
+                    // edit already mapped entity
+                    $entityIndex = $this->entitiesMap[$alias][$hash];
+                    $entity = $this->entities[$entityIndex];
+                }
+            } else {
+                // child entity
+                if (!isset($node['propertyName'])) {
+                    throw new \RuntimeException("Unknown property name for alias $alias");
+                }
+                if (in_array($parentAssociation, ['hasOne', 'belongsTo'])) {
+                    if (!$parent->has($node['propertyName'])) {
+                        // create new entity
+                        //TODO: do not create entity if all fields are null
+                        $entity = $this->constructEntity($className, $row[$alias]);
+                        $parent->set($node['propertyName'], $entity);
+                        $parent->clean();
                     } else {
-                        if (is_string($prop)) {
-                            $entity->set($prop, $childEntity);
-                        }
+                        // edit already mapped entity
+                        $entity = $parent->get($node['propertyName']);
                     }
-                    $out += $tree;
+                }
+                if (in_array($parentAssociation, ['hasMany', 'belongsToMany'])) {
+                    $siblings = $parent->get($node['propertyName']);
+                    if (!is_array($siblings)) {
+                        $siblings = [];
+                    }
+                    $parentHash = spl_object_hash($parent);
+                    $hash = $this->computeFieldsHash($row[$alias], $parentHash);
+                    if (!isset($this->entitiesMap[$alias][$hash])) {
+                        // create new entity
+                        //TODO: do not create entity if all fields are null
+                        $entity = $this->constructEntity($className, $row[$alias]);
+                        if ($entity !== null) {
+                            $siblings[] = $entity;
+                            $this->entitiesMap[$alias][$hash] = array_key_last($siblings);
+                        }
+                    } else {
+                        // edit already mapped entity
+                        $entityIndex = $this->entitiesMap[$alias][$hash];
+                        $entity = $siblings[$entityIndex];
+                    }
+                    $parent->set($node['propertyName'], $siblings);
+                    $parent->clean();
+                }
+            }
+            if ($this->hasAssociations($node)) {
+                foreach ($this->associationTypes as $associationType) {
+                    if (isset($node[$associationType])) {
+                        if (!is_array($node[$associationType])) {
+                            $message = "Association '$associationType' is not an array in mapping strategy";
+                            throw new \RuntimeException($message);
+                        }
+                        if (!isset($entity) || !($entity instanceof EntityInterface)) {
+                            throw new \RuntimeException('Parent entity must be an instance of EntityInterface');
+                        }
+                        $this->map($node[$associationType], $row, $entity, $associationType);
+                    }
                 }
             }
         }
-        unset($visited[$alias]);
-        return $out;
     }
 
-    protected function mergeEntityCollections(EntityInterface $into, EntityInterface $from): void
+    /**
+     * @param class-string<\Cake\Datasource\EntityInterface> $className
+     * @param mixed[] $fields
+     * @return \Cake\Datasource\EntityInterface|null
+     */
+    protected function constructEntity(string $className, array $fields): ?EntityInterface
     {
-        foreach ($from->toArray() as $prop => $val) {
-            if (!is_array($val)) {
+        $isEmpty = true;
+        foreach ($fields as $value) {
+            if ($value !== null) {
+                $isEmpty = false;
                 continue;
             }
-            $existing = $into->get($prop);
-            if (!is_array($existing)) {
-                $existing = [];
-            }
-            $merged = array_merge($existing, $val);
-            $unique = [];
-            $seen = [];
-            foreach ($merged as $child) {
-                if (!$child instanceof Entity) {
-                    $unique[] = $child;
-                    continue;
-                }
-                $alias = (string)$child->getSource();
-                $table = $this->resolveTableByAlias($alias);
-                if (!$table) {
-                    $oid = spl_object_id($child);
-                    if (!isset($seen[$oid])) {
-                        $seen[$oid] = true;
-                        $unique[] = $child;
-                    }
-                    continue;
-                }
-                $pk = $table->getPrimaryKey();
-                if (is_array($pk)) {
-                    $complexPrimaryKey = function ($p) use ($child) {
-                        /** @var string|null $primaryKeyValue */
-                        $primaryKeyValue = $child->get($p);
-                        return (string)$primaryKeyValue;
-                    };
-                    $value = implode('|', array_map($complexPrimaryKey, $pk));
-                } else {
-                    /** @var string|null $primaryKeyValue */
-                    $primaryKeyValue = $child->get($pk);
-                    $value = (string)$primaryKeyValue;
-                }
-                if (!isset($seen[$value])) {
-                    $seen[$value] = true;
-                    $unique[] = $child;
-                }
-            }
-            $into->set($prop, $unique);
         }
+        if ($isEmpty) {
+            return null;
+        }
+        $options = [
+            'markClean' => true,
+            'markNew' => false,
+        ];
+        return new $className($fields, $options);
     }
 
-    protected function entityKey(EntityInterface $e, Table $table): string
+    /**
+     * @param mixed[] $fields
+     * @param string|null $parentEntityHash
+     * @return string
+     */
+    protected function computeFieldsHash(array $fields, ?string $parentEntityHash = null): string
     {
-        $pk = $table->getPrimaryKey();
-        if (is_array($pk)) {
-            $complexPrimaryKey = function ($p) use ($e) {
-                /** @var string|null $primaryKeyValue */
-                $primaryKeyValue = $e->get($p);
-                return (string)($primaryKeyValue ?? '');
-            };
-            return implode('|', array_map($complexPrimaryKey, $pk));
+        $serialized = serialize($fields);
+        return md5($serialized . $parentEntityHash);
+    }
+
+    /**
+     * @param mixed[] $node
+     * @return bool
+     */
+    protected function hasAssociations(array $node): bool
+    {
+        $keys = array_keys($node);
+        return array_intersect($this->associationTypes, $keys) !== [];
+    }
+
+    /**
+     * @param mixed[][] $rows
+     * @return mixed[][][]
+     */
+    protected function parse(array $rows): array
+    {
+        $results = [];
+        foreach ($rows as $row) {
+            $models = [];
+            foreach ($row as $columnName => $columnValue) {
+                [$alias, $field] = explode('__', $columnName, 2);
+                $models[$alias][$field] = $columnValue;
+            }
+            $results[] = $models;
         }
-        /** @var string|null $primaryKeyValue */
-        $primaryKeyValue = $e->get($pk);
-        return (string)($primaryKeyValue ?? spl_object_id($e));
+        return $results;
     }
 }
