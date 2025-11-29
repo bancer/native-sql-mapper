@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Bancer\NativeQueryMapperTest\TestCase;
 
-use PHPUnit\Framework\TestCase;
 use Bancer\NativeQueryMapper\ORM\MissingColumnException;
 use Bancer\NativeQueryMapper\ORM\UnknownAliasException;
 use Bancer\NativeQueryMapperTest\TestApp\Model\Entity\Article;
@@ -18,6 +17,8 @@ use Bancer\NativeQueryMapperTest\TestApp\Model\Table\CommentsTable;
 use Bancer\NativeQueryMapperTest\TestApp\Model\Table\CountriesTable;
 use Bancer\NativeQueryMapperTest\TestApp\Model\Table\UsersTable;
 use Cake\ORM\Locator\LocatorAwareTrait;
+use DateTimeImmutable;
+use PHPUnit\Framework\TestCase;
 
 class NativeQueryMapperTest extends TestCase
 {
@@ -1223,5 +1224,31 @@ class NativeQueryMapperTest extends TestCase
         static::assertSame($cakeEntities[0]->toArray(), $actual[0]->toArray());
         $this->assertEqualsEntities($cakeEntities, $actual);
         static::assertEquals($cakeEntities, $actual);*/
+    }
+
+    public function testDatetimeFields(): void
+    {
+        /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\CommentsTable $CommentsTable */
+        $CommentsTable = $this->fetchTable(CommentsTable::class);
+        $stmt = $CommentsTable->prepareSQL("
+            SELECT
+                id         AS Comments__id,
+                content    AS Comments__content,
+                created    AS Comments__created
+            FROM comments
+        ");
+        $actual = $CommentsTable->fromNativeQuery($stmt)->all();
+        static::assertCount(5, $actual);
+        static::assertInstanceOf(Comment::class, $actual[0]);
+        $expected = [
+            'id' => 1,
+            'content' => 'Comment 1',
+            'created' => new DateTimeImmutable('2025-10-23 14:00:00'),
+        ];
+        $cakeEntities = $CommentsTable->find()
+            ->select(['Comments.id', 'Comments.content', 'Comments.created'])
+            ->toArray();
+        static::assertEquals($expected, $actual[0]->toArray());
+        static::assertEquals($cakeEntities, $actual);
     }
 }

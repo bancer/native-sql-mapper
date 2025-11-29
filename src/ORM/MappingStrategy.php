@@ -13,6 +13,7 @@ use Cake\ORM\Association\BelongsToMany;
 use Cake\ORM\Locator\LocatorAwareTrait;
 use Cake\Utility\Hash;
 use Cake\Utility\Inflector;
+use RuntimeException;
 
 class MappingStrategy
 {
@@ -34,6 +35,13 @@ class MappingStrategy
      * @var string[]
      */
     protected array $aliasList;
+
+    /**
+     * The map of aliases and corresponding Table objects.
+     *
+     * @var array<string,\Cake\ORM\Table|null>
+     */
+    protected array $aliasMap = [];
 
     /**
      * A list of aliases to be mapped.
@@ -63,12 +71,14 @@ class MappingStrategy
         }
         $this->aliasList = $aliases;
         $this->unknownAliases = array_combine($aliases, $aliases);
+        $this->aliasMap = array_fill_keys($aliases, null);
         $rootAlias = $rootTable->getAlias();
         if (!isset($this->unknownAliases[$rootAlias])) {
             $message = "The query must select at least one column from the root table.";
             $message .= " The column alias must use {$rootAlias}__{column_name} format";
             throw new UnknownAliasException($message);
         }
+        $this->aliasMap[$rootAlias] = $rootTable;
         unset($this->unknownAliases[$rootAlias]);
     }
 
@@ -120,6 +130,7 @@ class MappingStrategy
             if (!isset($this->unknownAliases[$alias])) {
                 continue;
             }
+            $this->aliasMap[$alias] = $target;
             unset($this->unknownAliases[$alias]);
             $firstLevelAssoc = [
                 'className' => $target->getEntityClass(),
@@ -137,6 +148,7 @@ class MappingStrategy
                         'primaryKey' => $assoc->junction()->getPrimaryKey(),
                         'propertyName' => Inflector::underscore(Inflector::singularize($through)),
                     ];
+                    $this->aliasMap[$through] = $assoc->junction();
                     unset($this->unknownAliases[$through]);
                 }
             }
@@ -179,6 +191,7 @@ class MappingStrategy
             if (!isset($this->unknownAliases[$childAlias])) {
                 continue;
             }
+            $this->aliasMap[$childAlias] = $target;
             unset($this->unknownAliases[$childAlias]);
             $result[$type][$childAlias]['className'] = $target->getEntityClass();
             $result[$type][$childAlias]['primaryKey'] = $target->getPrimaryKey();
@@ -194,6 +207,7 @@ class MappingStrategy
                     'propertyName' => Inflector::underscore(Inflector::singularize($through)),
                 ];
                 if (isset($this->unknownAliases[$through])) {
+                    $this->aliasMap[$through] = $assoc->junction();
                     unset($this->unknownAliases[$through]);
                 }
             } else {
@@ -240,5 +254,19 @@ class MappingStrategy
     private function unknownAliasesToString(): string
     {
         return implode("', '", array_keys($this->unknownAliases));
+    }
+
+    /**
+     * Gets aliases map.
+     *
+     * @return array<string,\Cake\ORM\Table> Keys are alias names.
+     */
+    public function getAliasMap(): array
+    {
+        $aliasWithoutTable = array_search(null, $this->aliasMap, true);
+        if (in_array(null, $this->aliasMap, true) || $aliasWithoutTable !== false) {
+            throw new RuntimeException("Failed to locate Table object for alias '$aliasWithoutTable'");
+        }
+        return $this->aliasMap;
     }
 }

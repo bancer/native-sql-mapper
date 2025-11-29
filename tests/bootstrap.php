@@ -60,6 +60,7 @@ $connection->execute("
         article_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
         content TEXT,
+        created DATETIME NULL,
         FOREIGN KEY (article_id) REFERENCES articles(id),
         FOREIGN KEY (user_id) REFERENCES users(id)
     );
@@ -123,13 +124,13 @@ $connection->execute("
 ");
 
 $connection->execute("
-    INSERT INTO comments (id, article_id, user_id, content)
+    INSERT INTO comments (id, article_id, user_id, content, created)
     VALUES
-        (1,1,2,'Comment 1'),
-        (2,1,3,'Comment 2'),
-        (3,2,1,'Comment 3'),
-        (4,3,4,'Comment 4'),
-        (5,5,5,'Comment 5');
+        (1,1,2,'Comment 1','2025-10-23 14:00:00'),
+        (2,1,3,'Comment 2','2025-10-24 15:00:00'),
+        (3,2,1,'Comment 3','2025-10-25 16:00:00'),
+        (4,3,4,'Comment 4','2025-10-26 17:00:00'),
+        (5,5,5,'Comment 5','2025-10-27 18:00:00');
 ");
 
 $connection->execute("
