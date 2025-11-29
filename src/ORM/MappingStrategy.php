@@ -81,7 +81,8 @@ class MappingStrategy
             }
         }
         if ($this->unknownAliases !== []) {
-            throw new UnknownAliasException('Failed to map some aliases: ' . $this->unknownAliasesToString());
+            $message = sprintf("None of the table associations match alias '%s'", $this->unknownAliasesToString());
+            throw new UnknownAliasException($message);
         }
         return $this;
     }
@@ -131,10 +132,11 @@ class MappingStrategy
             $result[$type][$alias] = $firstLevelAssoc;
         }
         if ($unknownAliasesCount > 0 && $unknownAliasesCount === count($this->unknownAliases)) {
-            throw new UnknownAliasException(
-                'None of the root table associations match any remaining aliases: ' .
-                $this->unknownAliasesToString()
+            $message = sprintf(
+                "None of the root table associations match alias '%s'",
+                $this->unknownAliasesToString(),
             );
+            throw new UnknownAliasException($message);
         }
         return $result;
     }
@@ -223,6 +225,6 @@ class MappingStrategy
 
     private function unknownAliasesToString(): string
     {
-        return implode(', ', array_keys($this->unknownAliases));
+        return implode("', '", array_keys($this->unknownAliases));
     }
 }
