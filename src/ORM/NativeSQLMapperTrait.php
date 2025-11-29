@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Bancer\NativeQueryMapper\ORM;
 
 use Cake\Database\StatementInterface;
-use Cake\ORM\Table;
 
 trait NativeSQLMapperTrait
 {

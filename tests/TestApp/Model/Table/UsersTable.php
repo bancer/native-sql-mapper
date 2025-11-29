@@ -21,5 +21,6 @@ class UsersTable extends Table
         parent::initialize($config);
         $this->belongsTo('Countries', ['className' => CountriesTable::class]);
         $this->hasOne('Profiles', ['className' => ProfilesTable::class]);
+        $this->hasMany('Articles', ['className' => ArticlesTable::class]);
     }
 }
