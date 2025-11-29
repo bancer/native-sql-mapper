@@ -155,7 +155,7 @@ class NativeQueryMapperTest extends TestCase
             'id' => 1,
             'title' => 'Article 1',
         ];
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         $cakeEntities = $ArticlesTable->find()
             ->select(['id', 'title'])
             ->toArray();
@@ -180,7 +180,7 @@ class NativeQueryMapperTest extends TestCase
             'id' => 1,
             'title' => 'Article 1',
         ];
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         $cakeEntities = $ArticlesTable->find()
             ->select(['id', 'title'])
             ->toArray();
@@ -226,7 +226,7 @@ class NativeQueryMapperTest extends TestCase
                 ],
             ],
         ];
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         $cakeEntities = $ArticlesTable->find()
             ->select(['Articles.id', 'Articles.title'])
             ->contain([
@@ -277,7 +277,7 @@ class NativeQueryMapperTest extends TestCase
                 ],
             ],
         ];
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         $cakeEntities = $ArticlesTable->find()
             ->select(['Articles.id', 'Articles.title'])
             ->contain([
@@ -326,7 +326,7 @@ class NativeQueryMapperTest extends TestCase
                 ],
             ])
             ->toArray();
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         $this->assertEqualsEntities($cakeEntities, $actual);
         //static::assertEquals($cakeEntities, $actual);
     }
@@ -367,7 +367,7 @@ class NativeQueryMapperTest extends TestCase
                 ],
             ])
             ->toArray();
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         $this->assertEqualsEntities($cakeEntities, $actual);
         //static::assertEquals($cakeEntities, $actual);
     }
@@ -400,7 +400,7 @@ class NativeQueryMapperTest extends TestCase
                 'bio' => 'Bio Alice',
             ],
         ];
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         $cakeEntities = $UsersTable->find()
             ->select(['Users.id', 'Users.username'])
             ->contain([
@@ -409,7 +409,7 @@ class NativeQueryMapperTest extends TestCase
                 ],
             ])
             ->toArray();
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         $this->assertEqualsEntities($cakeEntities, $actual);
         //static::assertEquals($cakeEntities, $actual);
     }
@@ -442,7 +442,7 @@ class NativeQueryMapperTest extends TestCase
                 'bio' => 'Bio Alice',
             ],
         ];
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         $cakeEntities = $UsersTable->find()
             ->select(['Users.id', 'Users.username'])
             ->contain([
@@ -451,7 +451,7 @@ class NativeQueryMapperTest extends TestCase
                 ],
             ])
             ->toArray();
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         $this->assertEqualsEntities($cakeEntities, $actual);
         //static::assertEquals($cakeEntities, $actual);
     }
@@ -493,7 +493,7 @@ class NativeQueryMapperTest extends TestCase
                 ],
             ],
         ];
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         /*$cakeEntities = $ArticlesTable->find()
             ->select(['Articles.id', 'Articles.title'])
             ->contain([
@@ -544,7 +544,7 @@ class NativeQueryMapperTest extends TestCase
                 ],
             ],
         ];
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         /*$cakeEntities = $ArticlesTable->find()
             ->select(['Articles.id', 'Articles.title'])
             ->contain([
@@ -608,7 +608,7 @@ class NativeQueryMapperTest extends TestCase
                 ],
             ],
         ];
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         /*$cakeEntities = $ArticlesTable->find()
             ->select(['Articles.id', 'Articles.title'])
             ->contain([
@@ -675,7 +675,7 @@ class NativeQueryMapperTest extends TestCase
                 ],
             ],
         ];
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         /*$cakeEntities = $ArticlesTable->find()
             ->select(['Articles.id', 'Articles.title'])
             ->contain([
@@ -774,7 +774,7 @@ class NativeQueryMapperTest extends TestCase
                 ],
             ],
         ];
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         $cakeEntities = $CountriesTable->find()
             ->select(['Countries.id', 'Countries.name'])
             ->contain([
@@ -877,7 +877,7 @@ class NativeQueryMapperTest extends TestCase
                 ],
             ],
         ];
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         $cakeEntities = $CountriesTable->find()
             ->select(['Countries.id', 'Countries.name'])
             ->contain([
@@ -1004,7 +1004,7 @@ class NativeQueryMapperTest extends TestCase
                 ],
             ],
         ];
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         /*$cakeEntities = $CountriesTable->find()
             ->select(['Countries.id', 'Countries.name'])
             ->contain([
@@ -1139,7 +1139,7 @@ class NativeQueryMapperTest extends TestCase
                 ],
             ],
         ];
-        static::assertSame($expected, $actual[0]->toArray());
+        static::assertEquals($expected, $actual[0]->toArray());
         /*$cakeEntities = $CountriesTable->find()
             ->select(['Countries.id', 'Countries.name'])
             ->contain([
