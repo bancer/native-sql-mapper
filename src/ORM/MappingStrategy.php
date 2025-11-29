@@ -164,6 +164,8 @@ class MappingStrategy
                 continue;
             }
             unset($this->unknownAliases[$childAlias]);
+            $result[$type][$childAlias]['className'] = $target->getEntityClass();
+            $result[$type][$childAlias]['propertyName'] = $assoc->getProperty();
             if ($assoc instanceof BelongsToMany) {
                 $through = $assoc->getThrough() ?? $assoc->junction();
                 if (is_object($through)) {

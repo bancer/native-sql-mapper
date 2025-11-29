@@ -153,7 +153,6 @@ class AutoHydratorRecursive
                 if (in_array($parentAssociation, ['hasOne', 'belongsTo'])) {
                     if (!$parent->has($node['propertyName'])) {
                         // create new entity
-                        //TODO: do not create entity if all fields are null
                         $entity = $this->constructEntity($className, $row[$alias]);
                         $parent->set($node['propertyName'], $entity);
                         $parent->clean();
@@ -171,7 +170,6 @@ class AutoHydratorRecursive
                     $hash = $this->computeFieldsHash($row[$alias], $parentHash);
                     if (!isset($this->entitiesMap[$alias][$hash])) {
                         // create new entity
-                        //TODO: do not create entity if all fields are null
                         $entity = $this->constructEntity($className, $row[$alias]);
                         if ($entity !== null) {
                             $siblings[] = $entity;
