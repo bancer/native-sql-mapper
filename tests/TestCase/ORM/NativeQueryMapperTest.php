@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Bancer\NativeQueryMapperTest\TestCase;
 
 use PHPUnit\Framework\TestCase;
+use Bancer\NativeQueryMapper\ORM\MissingColumnException;
 use Bancer\NativeQueryMapper\ORM\UnknownAliasException;
 use Bancer\NativeQueryMapperTest\TestApp\Model\Entity\Article;
 use Bancer\NativeQueryMapperTest\TestApp\Model\Entity\Comment;
@@ -188,7 +189,26 @@ class NativeQueryMapperTest extends TestCase
         //static::assertEquals($cakeEntities, $actual);
     }
 
-    public function testSelectHasMany(): void
+    public function testHasManyWithoutIdColumn(): void
+    {
+        $this->expectException(MissingColumnException::class);
+        $this->expectExceptionMessage("'Articles__id' column must be present in the query's SELECT clause");
+        /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
+        $ArticlesTable = $this->fetchTable(ArticlesTable::class);
+        $stmt = $ArticlesTable->prepareSQL("
+            SELECT
+                Articles.title      AS Articles__title,
+                Comments.id         AS Comments__id,
+                Comments.article_id AS Comments__article_id,
+                Comments.content    AS Comments__content
+            FROM articles AS Articles
+            LEFT JOIN comments AS Comments
+                ON Articles.id=Comments.article_id
+        ");
+        $ArticlesTable->fromNativeQuery($stmt)->all();
+    }
+
+    public function testHasMany(): void
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
@@ -239,7 +259,7 @@ class NativeQueryMapperTest extends TestCase
         //static::assertEquals($cakeEntities, $actual);
     }
 
-    public function testSelectHasManyMinimalSQL(): void
+    public function testHasManyMinimalSQL(): void
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
@@ -290,7 +310,7 @@ class NativeQueryMapperTest extends TestCase
         //static::assertEquals($cakeEntities, $actual);
     }
 
-    public function testSelectBelongsTo(): void
+    public function testBelongsTo(): void
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\CommentsTable $CommentsTable */
         $CommentsTable = $this->fetchTable(CommentsTable::class);
@@ -331,7 +351,44 @@ class NativeQueryMapperTest extends TestCase
         //static::assertEquals($cakeEntities, $actual);
     }
 
-    public function testSelectBelongsToMinimalSQL(): void
+    public function testBelongsToWithoutIdColumns(): void
+    {
+        /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\CommentsTable $CommentsTable */
+        $CommentsTable = $this->fetchTable(CommentsTable::class);
+        $stmt = $CommentsTable->prepareSQL("
+            SELECT
+                article_id AS Comments__article_id,
+                content    AS Comments__content,
+                title      AS Articles__title
+            FROM comments
+            LEFT JOIN articles
+                ON articles.id=comments.article_id
+        ");
+        $actual = $CommentsTable->fromNativeQuery($stmt)->all();
+        static::assertCount(5, $actual);
+        static::assertInstanceOf(Comment::class, $actual[0]);
+        static::assertInstanceOf(Article::class, $actual[0]->get('article'));
+        $expected = [
+            'article_id' => 1,
+            'content' => 'Comment 1',
+            'article' => [
+                'title' => 'Article 1',
+            ],
+        ];
+        $cakeEntities = $CommentsTable->find()
+            ->select(['Comments.article_id', 'Comments.content'])
+            ->contain([
+                'Articles' => [
+                    'fields' => ['Articles.title'],
+                ],
+            ])
+            ->toArray();
+        static::assertEquals($expected, $actual[0]->toArray());
+        $this->assertEqualsEntities($cakeEntities, $actual);
+        //static::assertEquals($cakeEntities, $actual);
+    }
+
+    public function testBelongsToMinimalSQL(): void
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\CommentsTable $CommentsTable */
         $CommentsTable = $this->fetchTable(CommentsTable::class);
