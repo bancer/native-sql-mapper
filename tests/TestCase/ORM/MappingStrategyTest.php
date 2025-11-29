@@ -37,19 +37,23 @@ class MappingStrategyTest extends TestCase
         $expected = [
             'Articles' => [
                 'className' => Article::class,
+                'primaryKey' => 'id',
                 'belongsTo' => [
                     'Users' => [
                         'className' => User::class,
+                        'primaryKey' => 'id',
                         'propertyName' => 'user',
                         'belongsTo' => [
                             'Countries' => [
                                 'className' => Country::class,
+                                'primaryKey' => 'id',
                                 'propertyName' => 'country',
                             ],
                         ],
                         'hasOne' => [
                             'Profiles' => [
                                 'className' => Profile::class,
+                                'primaryKey' => 'id',
                                 'propertyName' => 'profile',
                             ],
                         ],
@@ -58,10 +62,12 @@ class MappingStrategyTest extends TestCase
                 'belongsToMany' => [
                     'Tags' => [
                         'className' => Tag::class,
+                        'primaryKey' => 'id',
                         'propertyName' => 'tags',
                         'hasOne' => [
                             'ArticlesTags' => [
                                 'className' => Entity::class,
+                                'primaryKey' => 'id',
                                 'propertyName' => 'articles_tag',
                             ],
                         ],
@@ -70,6 +76,7 @@ class MappingStrategyTest extends TestCase
                 'hasMany' => [
                     'Comments' => [
                         'className' => Comment::class,
+                        'primaryKey' => 'id',
                         'propertyName' => 'comments',
                     ],
                 ],
@@ -90,9 +97,11 @@ class MappingStrategyTest extends TestCase
         $expected = [
             'Articles' => [
                 'className' => Article::class,
+                'primaryKey' => 'id',
                 'belongsToMany' => [
                     'Tags' => [
                         'className' => Tag::class,
+                        'primaryKey' => 'id',
                         'propertyName' => 'tags',
                     ],
                 ],
@@ -114,13 +123,16 @@ class MappingStrategyTest extends TestCase
         $expected = [
             'Articles' => [
                 'className' => Article::class,
+                'primaryKey' => 'id',
                 'belongsToMany' => [
                     'Tags' => [
                         'className' => Tag::class,
+                        'primaryKey' => 'id',
                         'propertyName' => 'tags',
                         'hasOne' => [
                             'ArticlesTags' => [
                                 'className' => Entity::class,
+                                'primaryKey' => 'id',
                                 'propertyName' => 'articles_tag',
                             ],
                         ],

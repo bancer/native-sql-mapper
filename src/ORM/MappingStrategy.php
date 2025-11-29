@@ -18,6 +18,14 @@ class MappingStrategy
 {
     use LocatorAwareTrait;
 
+    public const BELONGS_TO = 'belongsTo';
+
+    public const BELONGS_TO_MANY = 'belongsToMany';
+
+    public const HAS_ONE = 'hasOne';
+
+    public const HAS_MANY = 'hasMany';
+
     protected Table $rootTable;
 
     /**
@@ -99,6 +107,7 @@ class MappingStrategy
         /** @var mixed[] $result */
         $result = [
             'className' => $table->getEntityClass(),
+            'primaryKey' => $table->getPrimaryKey(),
         ];
         /** @var \Cake\ORM\Association $assoc */
         foreach ($table->associations() as $assoc) {
@@ -114,6 +123,7 @@ class MappingStrategy
             unset($this->unknownAliases[$alias]);
             $firstLevelAssoc = [
                 'className' => $target->getEntityClass(),
+                'primaryKey' => $target->getPrimaryKey(),
                 'propertyName' => $assoc->getProperty(),
             ];
             if ($assoc instanceof BelongsToMany) {
@@ -122,8 +132,9 @@ class MappingStrategy
                     $through = $through->getAlias();
                 }
                 if (isset($this->unknownAliases[$through])) {
-                    $firstLevelAssoc['hasOne'][$through] = [
+                    $firstLevelAssoc[self::HAS_ONE][$through] = [
                         'className' => $assoc->junction()->getEntityClass(),
+                        'primaryKey' => $assoc->junction()->getPrimaryKey(),
                         'propertyName' => Inflector::underscore(Inflector::singularize($through)),
                     ];
                     unset($this->unknownAliases[$through]);
@@ -156,6 +167,7 @@ class MappingStrategy
         /** @var mixed[] $result */
         $result = [
             'className' => $table->getEntityClass(),
+            'primaryKey' => $table->getPrimaryKey(),
         ];
         foreach ($table->associations() as $assoc) {
             $type = $this->assocType($assoc);
@@ -169,14 +181,16 @@ class MappingStrategy
             }
             unset($this->unknownAliases[$childAlias]);
             $result[$type][$childAlias]['className'] = $target->getEntityClass();
+            $result[$type][$childAlias]['primaryKey'] = $target->getPrimaryKey();
             $result[$type][$childAlias]['propertyName'] = $assoc->getProperty();
             if ($assoc instanceof BelongsToMany) {
                 $through = $assoc->getThrough() ?? $assoc->junction();
                 if (is_object($through)) {
                     $through = $through->getAlias();
                 }
-                $result[$type][$childAlias]['hasOne'][$through] = [
+                $result[$type][$childAlias][self::HAS_ONE][$through] = [
                     'className' => $assoc->junction()->getEntityClass(),
+                    'primaryKey' => $assoc->junction()->getPrimaryKey(),
                     'propertyName' => Inflector::underscore(Inflector::singularize($through)),
                 ];
                 if (isset($this->unknownAliases[$through])) {
@@ -200,10 +214,10 @@ class MappingStrategy
     private function assocType(Association $assoc): ?string
     {
         $map = [
-            HasOne::class        => 'hasOne',
-            BelongsTo::class     => 'belongsTo',
-            BelongsToMany::class => 'belongsToMany',
-            HasMany::class       => 'hasMany',
+            HasOne::class        => self::HAS_ONE,
+            BelongsTo::class     => self::BELONGS_TO,
+            BelongsToMany::class => self::BELONGS_TO_MANY,
+            HasMany::class       => self::HAS_MANY,
         ];
         foreach ($map as $class => $type) {
             if ($assoc instanceof $class) {
