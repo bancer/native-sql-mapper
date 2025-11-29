@@ -14,7 +14,7 @@ class StatementQuery
     protected bool $isExecuted;
 
     /**
-     * @var callable|null
+     * @var mixed[]|null
      */
     protected $mapStrategy = null;
 
@@ -28,10 +28,10 @@ class StatementQuery
     /**
      * Provide a custom mapping strategy.
      *
-     * @param callable $strategy
+     * @param mixed[] $strategy
      * @return $this
      */
-    public function mapStrategy(callable $strategy): self
+    public function mapStrategy(array $strategy): self
     {
         $this->mapStrategy = $strategy;
         return $this;
@@ -52,10 +52,41 @@ class StatementQuery
         if (!$rows) {
             return [];
         }
-        if ($this->mapStrategy !== null) {
-            return array_map($this->mapStrategy, $rows);
+        if ($this->mapStrategy === null) {
+            $aliases = $this->extractAliases($rows);
+            $strategy = new MappingStrategy($this->rootTable, $aliases);
+            $this->mapStrategy = $strategy->build()->toArray();
         }
-        $hydrator = new AutoHydratorRecursive($this->rootTable, $rows);
+        $hydrator = new AutoHydratorRecursive($this->rootTable, $this->mapStrategy);
         return $hydrator->hydrateMany($rows);
+    }
+
+    /**
+     * Extracts aliases of the columns from the query's result set.
+     *
+     * @param mixed[] $rows Result set rows.
+     * @return string[]
+     */
+    protected function extractAliases(array $rows): array
+    {
+        $firstRow = $rows[0] ?? [];
+        if (!is_array($firstRow)) {
+            throw new \InvalidArgumentException('First element of the result set is not an array');
+        }
+        $keys = array_keys($firstRow);
+        $aliases = [];
+        foreach ($keys as $key) {
+            if (!is_string($key) || !str_contains($key, '__')) {
+                throw new UnknownAliasException("Column '$key' must use an alias in the format {Alias}__$key");
+            }
+            [$alias, $field] = explode('__', $key, 2);
+            if (mb_strlen($alias) <= 0 || mb_strlen($field) <= 0) {
+                $message = "Alias '$key' is invalid. Column alias must use {Alias}__{column_name} format";
+                throw new UnknownAliasException($message);
+            }
+            $aliases[] = $alias;
+        }
+        sort($aliases);
+        return $aliases;
     }
 }

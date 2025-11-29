@@ -22,14 +22,6 @@ class AutoHydratorRecursive
     ];
 
     /**
-     * @var string[]
-     */
-    protected array $aliases;
-
-    /** @var array<string,string[]> SQL alias => fields */
-    protected array $aliasMap = [];
-
-    /**
      * Precomputed mapping strategy.
      *
      * @var mixed[]
@@ -54,40 +46,12 @@ class AutoHydratorRecursive
 
     /**
      * @param \Cake\ORM\Table $rootTable
-     * @param mixed[] $rows The result set of `$this->stmt->fetchAll(\PDO::FETCH_ASSOC);`.
+     * @param mixed[] $mappingStrategy Mapping strategy.
      */
-    public function __construct(Table $rootTable, array $rows)
+    public function __construct(Table $rootTable, array $mappingStrategy)
     {
         $this->rootTable = $rootTable;
-        $firstRow = $rows[0] ?? [];
-        if (!is_array($firstRow)) {
-            throw new \InvalidArgumentException('First element of the result set is not an array');
-        }
-        $keys = array_keys($firstRow);
-        $this->aliasMap = $this->buildAliasMap($keys);
-        $this->aliases = array_keys($this->aliasMap);
-        $strategy = new MappingStrategy($rootTable, $this->aliases);
-        $this->mappingStrategy = $strategy->build()->toArray();
-    }
-
-    /**
-     * @param (string|null)[] $keys
-     * @return string[][]
-     */
-    protected function buildAliasMap(array $keys): array
-    {
-        $map = [];
-        foreach ($keys as $key) {
-            if (!is_string($key) || !str_contains($key, '__')) {
-                throw new UnknownAliasException("Alias '$key' is invalid");
-            }
-            [$alias, $field] = explode('__', $key, 2);
-            if (mb_strlen($alias) <= 0 || mb_strlen($field) <= 0) {
-                throw new UnknownAliasException("Alias '$key' is invalid");
-            }
-            $map[$alias][] = $field;
-        }
-        return $map;
+        $this->mappingStrategy = $mappingStrategy;
     }
 
     /**

@@ -57,7 +57,9 @@ class MappingStrategy
         $this->unknownAliases = array_combine($aliases, $aliases);
         $rootAlias = $rootTable->getAlias();
         if (!isset($this->unknownAliases[$rootAlias])) {
-            throw new UnknownAliasException("The query must use root table alias '$rootAlias'");
+            $message = "The query must select at least one column from the root table.";
+            $message .= " The column alias must use {$rootAlias}__{column_name} format";
+            throw new UnknownAliasException($message);
         }
         unset($this->unknownAliases[$rootAlias]);
     }

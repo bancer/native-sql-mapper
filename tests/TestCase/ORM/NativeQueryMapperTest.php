@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Bancer\NativeQueryMapperTest\TestCase;
 
 use PHPUnit\Framework\TestCase;
+use Bancer\NativeQueryMapper\ORM\UnknownAliasException;
 use Bancer\NativeQueryMapperTest\TestApp\Model\Entity\Article;
 use Bancer\NativeQueryMapperTest\TestApp\Model\Entity\Comment;
 use Bancer\NativeQueryMapperTest\TestApp\Model\Entity\Country;
@@ -14,9 +15,8 @@ use Bancer\NativeQueryMapperTest\TestApp\Model\Entity\User;
 use Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable;
 use Bancer\NativeQueryMapperTest\TestApp\Model\Table\CommentsTable;
 use Bancer\NativeQueryMapperTest\TestApp\Model\Table\CountriesTable;
-use Cake\ORM\Locator\LocatorAwareTrait;
-use Bancer\NativeQueryMapper\ORM\UnknownAliasException;
 use Bancer\NativeQueryMapperTest\TestApp\Model\Table\UsersTable;
+use Cake\ORM\Locator\LocatorAwareTrait;
 
 class NativeQueryMapperTest extends TestCase
 {
@@ -41,7 +41,9 @@ class NativeQueryMapperTest extends TestCase
     public function testInvalidAlias(): void
     {
         $this->expectException(UnknownAliasException::class);
-        $this->expectExceptionMessage("The query must use root table alias 'Articles'");
+        $expectedMessage = "The query must select at least one column from the root table.";
+        $expectedMessage .= " The column alias must use Articles__{column_name} format";
+        $this->expectExceptionMessage($expectedMessage);
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
         $stmt = $ArticlesTable->prepareSQL("
@@ -49,6 +51,38 @@ class NativeQueryMapperTest extends TestCase
                 a.id AS a__id,
                 a.title AS a__title
             FROM articles AS a
+        ");
+        $ArticlesTable->fromNativeQuery($stmt)->all();
+    }
+
+    public function testMissingColumnAlias(): void
+    {
+        $this->expectException(UnknownAliasException::class);
+        $this->expectExceptionMessage("Column 'title' must use an alias in the format {Alias}__title");
+        /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
+        $ArticlesTable = $this->fetchTable(ArticlesTable::class);
+        $stmt = $ArticlesTable->prepareSQL("
+            SELECT
+                id AS Articles__id,
+                title
+            FROM articles
+        ");
+        $ArticlesTable->fromNativeQuery($stmt)->all();
+    }
+
+    public function testIncompleteColumnAlias(): void
+    {
+        $this->expectException(UnknownAliasException::class);
+        $this->expectExceptionMessage(
+            "Alias 'Articles__' is invalid. Column alias must use {Alias}__{column_name} format",
+        );
+        /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
+        $ArticlesTable = $this->fetchTable(ArticlesTable::class);
+        $stmt = $ArticlesTable->prepareSQL("
+            SELECT
+                id AS Articles__id,
+                title AS Articles__
+            FROM articles
         ");
         $ArticlesTable->fromNativeQuery($stmt)->all();
     }
