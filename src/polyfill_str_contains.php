@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 if (!function_exists('str_contains')) {
     /**
      * Polyfill for PHP 8 str_contains() for PHP 7.4.

@@ -9,11 +9,26 @@ use Cake\Datasource\EntityInterface;
 use Cake\Utility\Hash;
 use RuntimeException;
 
-class AutoHydratorRecursive
+/**
+ * Recursively hydrates nested CakePHP entities from a set of rows produced
+ * by a native SQL query using Cake-style `{Alias}__{field}` column naming.
+ *
+ * This class constructs entity graphs according to a precomputed
+ * `MappingStrategy`, supports deep associations and belongsToMany relations,
+ * and caches hydrated entities to avoid duplication during recursion.
+ */
+class RecursiveEntityHydrator
 {
+    /**
+     * The root Table instance initiating hydration.
+     *
+     * @var \Cake\ORM\Table
+     */
     protected Table $rootTable;
 
     /**
+     * Supported association types in the mapping strategy.
+     *
      * @var string[]
      */
     protected array $associationTypes = [
@@ -24,46 +39,55 @@ class AutoHydratorRecursive
     ];
 
     /**
-     * Precomputed mapping strategy.
+     * Precomputed mapping strategy produced by MappingStrategy::build()->toArray().
      *
      * @var mixed[]
      */
     protected array $mappingStrategy = [];
 
     /**
+     * Maps each alias to a map of hashed field sets to entity index.
+     *
+     * Example:
      * [
-     *    '{alias}' => [
-     *        '{hash}' => {index},
-     *    ],
+     *     'Articles' => [
+     *         'a1b2c3' => 0,
+     *         'd4e5f6' => 1,
+     *     ],
      * ]
      *
-     * @var int[][]
+     * @var array<string, array<string, int>>
      */
     protected array $entitiesMap = [];
 
     /**
-     * The map of aliases and corresponding Table objects.
+     * A map of aliases to their corresponding Table objects.
      *
-     * @var array<string,\Cake\ORM\Table|null>
+     * @var array<string, \Cake\ORM\Table|null>
      */
     protected array $aliasMap = [];
 
     /**
+     * List of hydrated root-level entities.
+     *
      * @var \Cake\Datasource\EntityInterface[]
      */
     protected array $entities = [];
 
     /**
-     * If mapping strategy contains hasMany or belongsToMany association then all mapped models must have primary keys.
+     * Whether the presence of primary keys is mandatory for all entities,
+     * inferred automatically based on the mapping strategy.
      *
-     * @var boolean
+     * @var bool
      */
-    protected bool $isPrimaryKeyRequired;
+    private bool $isPrimaryKeyRequired;
 
     /**
-     * @param \Cake\ORM\Table $rootTable
-     * @param mixed[] $mappingStrategy Mapping strategy.
-     * @param array<string,\Cake\ORM\Table> $aliasMap Aliases and corresponding Table objects.
+     * Constructor.
+     *
+     * @param \Cake\ORM\Table $rootTable The root Table instance.
+     * @param mixed[] $mappingStrategy Precomputed mapping strategy.
+     * @param array<string,\Cake\ORM\Table> $aliasMap Map of aliases to Table objects.
      */
     public function __construct(Table $rootTable, array $mappingStrategy, array $aliasMap)
     {
@@ -73,7 +97,9 @@ class AutoHydratorRecursive
     }
 
     /**
-     * @param mixed[][] $rows
+     * Hydrate an array of rows into a list of fully mapped entities.
+     *
+     * @param mixed[][] $rows Flat rows from PDO::FETCH_ASSOC.
      * @return \Cake\Datasource\EntityInterface[]
      */
     public function hydrateMany(array $rows): array
@@ -86,11 +112,13 @@ class AutoHydratorRecursive
     }
 
     /**
+     * Recursively map aliases to entities and attach them to their parent entities.
      *
-     * @param mixed[] $mappingStrategy
-     * @param mixed[][] $row
-     * @param \Cake\Datasource\EntityInterface $parent
-     * @param string $parentAssociation
+     * @param mixed[] $mappingStrategy Strategy node for the current level.
+     * @param mixed[][] $row Parsed row grouped by alias.
+     * @param \Cake\Datasource\EntityInterface|null $parent Parent entity, if any.
+     * @param string|null $parentAssociation Association type joining child to parent.
+     * @return void
      */
     protected function map(
         array $mappingStrategy,
@@ -185,10 +213,16 @@ class AutoHydratorRecursive
     }
 
     /**
-     * @param class-string<\Cake\Datasource\EntityInterface> $className Entity class name.
-     * @param mixed[] $fields Entity fields with values.
-     * @param string $alias Entity alias.
-     * @param string[]|string|null $primaryKey The name(s) of the primary key column(s).
+     * Create an entity from raw field data using either:
+     *  - Table marshaller (preferred), or
+     *  - direct entity instantiation (fallback).
+     *
+     * Returns null when the row for the alias is "empty" (all NULL fields).
+     *
+     * @param class-string<\Cake\Datasource\EntityInterface> $className Entity class.
+     * @param mixed[] $fields Raw database fields.
+     * @param string $alias Alias of the entity.
+     * @param string[]|string|null $primaryKey Primary key name(s).
      * @return \Cake\Datasource\EntityInterface|null
      */
     protected function constructEntity(
@@ -243,8 +277,11 @@ class AutoHydratorRecursive
     }
 
     /**
-     * @param mixed[] $fields
-     * @param string|null $parentEntityHash
+     * Compute a stable hash for an entity's field set,
+     * optionally including the parent entity's hash for hasMany relations.
+     *
+     * @param mixed[] $fields Raw database fields.
+     * @param string|null $parentEntityHash The hash of the parent entity object.
      * @return string
      */
     protected function computeFieldsHash(array $fields, ?string $parentEntityHash = null): string
@@ -254,6 +291,8 @@ class AutoHydratorRecursive
     }
 
     /**
+     * Determine if the current mapping-strategy node contains associations.
+     *
      * @param mixed[] $node
      * @return bool
      */
@@ -264,6 +303,13 @@ class AutoHydratorRecursive
     }
 
     /**
+     * Parse rows grouped by `{Alias}__{field}` format into:
+     *
+     *     [
+     *         ['Articles' => [...], 'Comments' => [...]],
+     *         ['Articles' => [...], 'Comments' => [...]],
+     *     ]
+     *
      * @param mixed[][] $rows
      * @return mixed[][][]
      */
@@ -282,8 +328,9 @@ class AutoHydratorRecursive
     }
 
     /**
-     * Checks whether the mapping strategy requires all primary keys to be present.
-     * If mapping strategy contains hasMany or belongsToMany association then all mapped models must have primary keys.
+     * Check if the strategy requires primary keys for ALL mapped entities.
+     *
+     * Required when using hasMany or belongsToMany associations.
      *
      * @return bool
      */
