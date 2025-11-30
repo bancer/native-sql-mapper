@@ -7,17 +7,53 @@ namespace Bancer\NativeQueryMapper\ORM;
 use Cake\Database\StatementInterface;
 use Cake\ORM\Table;
 
-class StatementQuery
+/**
+ * Wrapper around a prepared SQL statement that executes it
+ * and hydrates the result set into CakePHP entities using
+ * a mapping strategy inferred from column aliases.
+ *
+ * This class is created via `prepareNativeStatement()` and
+ * `mapNativeStatement()` in the `NativeSQLMapperTrait`.
+ */
+class NativeQueryResultMapper
 {
+    /**
+     * The root table used to determine entity classes,
+     * associations, and hydration rules.
+     *
+     * @var \Cake\ORM\Table
+     */
     protected Table $rootTable;
+
+    /**
+     * The prepared PDO statement to be executed.
+     *
+     * @var \Cake\Database\StatementInterface
+     */
     protected StatementInterface $stmt;
+
+    /**
+     * Whether the statement has already been executed.
+     *
+     * @var bool
+     */
     protected bool $isExecuted;
 
     /**
-     * @var mixed[]|null
+     * Custom mapping strategy used to hydrate entities.
+     * If null, a MappingStrategy will be automatically built
+     * based on detected column aliases.
+     *
+     * @var array<string,mixed>|null
      */
     protected $mapStrategy = null;
 
+    /**
+     * Constructor.
+     *
+     * @param \Cake\ORM\Table $rootTable The root table instance.
+     * @param \Cake\Database\StatementInterface $stmt The prepared statement.
+     */
     public function __construct(Table $rootTable, StatementInterface $stmt)
     {
         $this->rootTable = $rootTable;
@@ -26,21 +62,26 @@ class StatementQuery
     }
 
     /**
-     * Provide a custom mapping strategy.
+     * Provide a custom mapping strategy instead of relying
+     * on automatic alias inference.
      *
-     * @param mixed[] $strategy
+     * The structure must match the output of MappingStrategy::toArray().
+     *
+     * @param array<string,mixed> $strategy Mapping configuration.
      * @return $this
      */
-    public function mapStrategy(array $strategy): self
+    public function setMappingStrategy(array $strategy): self
     {
         $this->mapStrategy = $strategy;
         return $this;
     }
 
     /**
-     * Execute and hydrate results.
+     * Execute the SQL statement if not executed yet, fetch all rows,
+     * build (or use) the mapping strategy, and hydrate the result set
+     * into entities.
      *
-     * @return \Cake\Datasource\EntityInterface[]
+     * @return \Cake\Datasource\EntityInterface[] Hydrated entity list.
      */
     public function all(): array
     {
@@ -64,10 +105,17 @@ class StatementQuery
     }
 
     /**
-     * Extracts aliases of the columns from the query's result set.
+     * Extract column aliases used in the SQL result set.
      *
-     * @param mixed[] $rows Result set rows.
-     * @return string[]
+     * Each column must follow `{Alias}__{column}` format.
+     * Throws UnknownAliasException if the alias format is invalid.
+     *
+     * @param array<int,array<string,mixed>|mixed> $rows Result set rows.
+     * @return string[] Sorted list of unique aliases.
+     *
+     * @throws \InvalidArgumentException If the first row is not an array.
+     * @throws \Bancer\NativeQueryMapper\ORM\UnknownAliasException
+     *         If a column does not follow expected alias format.
      */
     protected function extractAliases(array $rows): array
     {

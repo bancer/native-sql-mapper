@@ -30,8 +30,17 @@
     "minimum-stability": "stable",
     "scripts": {
         "all-tests": [
+            "echo '------------------------------------------'",
+            "echo '---           PHPSTAN TESTS            ---'",
+            "echo '------------------------------------------'",
             "@phpstan",
+            "echo '------------------------------------------'",
+            "echo '---           PHPCS TESTS              ---'",
+            "echo '------------------------------------------'",
             "@phpcs",
+            "echo '------------------------------------------'",
+            "echo '---           PHPUNIT TESTS            ---'",
+            "echo '------------------------------------------'",
             "@phpunit"
         ],
         "ci-tests": [
@@ -42,7 +51,8 @@
         "phpstan": "vendor/bin/phpstan analyse -c phpstan.neon",
         "phpcs": "vendor/bin/phpcs --standard=PSR12 -p src tests",
         "phpunit": "vendor/bin/phpunit tests",
-        "phpunit-coverage": "XDEBUG_MODE=coverage vendor/bin/phpunit tests --coverage-text"
+        "phpunit-coverage": "XDEBUG_MODE=coverage vendor/bin/phpunit tests --coverage-text",
+        "phpunit-coverage-html": "XDEBUG_MODE=coverage vendor/bin/phpunit tests --coverage-html coverage/"
     },
     "config": {
         "allow-plugins": {

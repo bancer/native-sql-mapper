@@ -48,13 +48,13 @@ class NativeQueryMapperTest extends TestCase
         $this->expectExceptionMessage($expectedMessage);
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-        $stmt = $ArticlesTable->prepareSQL("
+        $stmt = $ArticlesTable->prepareNativeStatement("
             SELECT
                 a.id    AS a__id,
                 a.title AS a__title
             FROM articles AS a
         ");
-        $ArticlesTable->fromNativeQuery($stmt)->all();
+        $ArticlesTable->mapNativeStatement($stmt)->all();
     }
 
     public function testMissingAlias(): void
@@ -63,13 +63,13 @@ class NativeQueryMapperTest extends TestCase
         $this->expectExceptionMessage("Column 'title' must use an alias in the format {Alias}__title");
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-        $stmt = $ArticlesTable->prepareSQL("
+        $stmt = $ArticlesTable->prepareNativeStatement("
             SELECT
                 id AS Articles__id,
                 title
             FROM articles
         ");
-        $ArticlesTable->fromNativeQuery($stmt)->all();
+        $ArticlesTable->mapNativeStatement($stmt)->all();
     }
 
     public function testIncompleteAlias(): void
@@ -80,13 +80,13 @@ class NativeQueryMapperTest extends TestCase
         );
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-        $stmt = $ArticlesTable->prepareSQL("
+        $stmt = $ArticlesTable->prepareNativeStatement("
             SELECT
                 id      AS Articles__id,
                 title   AS Articles__
             FROM articles
         ");
-        $ArticlesTable->fromNativeQuery($stmt)->all();
+        $ArticlesTable->mapNativeStatement($stmt)->all();
     }
 
     public function testUnrecognizedRootAlias(): void
@@ -95,13 +95,13 @@ class NativeQueryMapperTest extends TestCase
         $this->expectExceptionMessage("None of the root table associations match alias 'Books'");
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-        $stmt = $ArticlesTable->prepareSQL("
+        $stmt = $ArticlesTable->prepareNativeStatement("
             SELECT
                 id      AS Articles__id,
                 title   AS Books__title
             FROM articles
         ");
-        $ArticlesTable->fromNativeQuery($stmt)->all();
+        $ArticlesTable->mapNativeStatement($stmt)->all();
     }
 
     public function testUnrecognizedChildAlias(): void
@@ -110,7 +110,7 @@ class NativeQueryMapperTest extends TestCase
         $this->expectExceptionMessage("None of the table associations match alias 'Books'");
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-        $stmt = $ArticlesTable->prepareSQL("
+        $stmt = $ArticlesTable->prepareNativeStatement("
             SELECT
                 Articles.id         AS Articles__id,
                 Articles.title      AS Articles__title,
@@ -121,14 +121,14 @@ class NativeQueryMapperTest extends TestCase
             LEFT JOIN comments AS Comments
                 ON Articles.id=Comments.article_id
         ");
-        $ArticlesTable->fromNativeQuery($stmt)->all();
+        $ArticlesTable->mapNativeStatement($stmt)->all();
     }
 
     public function testEmptyResultSet(): void
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-        $stmt = $ArticlesTable->prepareSQL("
+        $stmt = $ArticlesTable->prepareNativeStatement("
             SELECT
                 Articles.id     AS Articles__id,
                 Articles.title  AS Articles__title
@@ -136,7 +136,7 @@ class NativeQueryMapperTest extends TestCase
             WHERE Articles.title = :title
         ");
         $stmt->bindValue('title', 'Non-existing-title');
-        $actual = $ArticlesTable->fromNativeQuery($stmt)->all();
+        $actual = $ArticlesTable->mapNativeStatement($stmt)->all();
         static::assertSame([], $actual);
     }
 
@@ -144,13 +144,13 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-        $stmt = $ArticlesTable->prepareSQL("
+        $stmt = $ArticlesTable->prepareNativeStatement("
             SELECT
                 Articles.id     AS Articles__id,
                 Articles.title  AS Articles__title
             FROM articles AS Articles
         ");
-        $actual = $ArticlesTable->fromNativeQuery($stmt)->all();
+        $actual = $ArticlesTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(Article::class, $actual[0]);
         $expected = [
@@ -169,13 +169,13 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-        $stmt = $ArticlesTable->prepareSQL("
+        $stmt = $ArticlesTable->prepareNativeStatement("
             SELECT
                 id AS Articles__id,
                 title AS Articles__title
             FROM articles
         ");
-        $actual = $ArticlesTable->fromNativeQuery($stmt)->all();
+        $actual = $ArticlesTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(Article::class, $actual[0]);
         $expected = [
@@ -196,7 +196,7 @@ class NativeQueryMapperTest extends TestCase
         $this->expectExceptionMessage("'Articles__id' column must be present in the query's SELECT clause");
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-        $stmt = $ArticlesTable->prepareSQL("
+        $stmt = $ArticlesTable->prepareNativeStatement("
             SELECT
                 Articles.title      AS Articles__title,
                 Comments.id         AS Comments__id,
@@ -206,14 +206,14 @@ class NativeQueryMapperTest extends TestCase
             LEFT JOIN comments AS Comments
                 ON Articles.id=Comments.article_id
         ");
-        $ArticlesTable->fromNativeQuery($stmt)->all();
+        $ArticlesTable->mapNativeStatement($stmt)->all();
     }
 
     public function testHasMany(): void
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-        $stmt = $ArticlesTable->prepareSQL("
+        $stmt = $ArticlesTable->prepareNativeStatement("
             SELECT
                 Articles.id         AS Articles__id,
                 Articles.title      AS Articles__title,
@@ -224,7 +224,7 @@ class NativeQueryMapperTest extends TestCase
             LEFT JOIN comments AS Comments
                 ON Articles.id=Comments.article_id
         ");
-        $actual = $ArticlesTable->fromNativeQuery($stmt)->all();
+        $actual = $ArticlesTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(Article::class, $actual[0]);
         $actualComments = $actual[0]->get('comments');
@@ -264,7 +264,7 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-        $stmt = $ArticlesTable->prepareSQL("
+        $stmt = $ArticlesTable->prepareNativeStatement("
             SELECT
                 a.id        AS Articles__id,
                 title       AS Articles__title,
@@ -275,7 +275,7 @@ class NativeQueryMapperTest extends TestCase
             LEFT JOIN comments AS c
                 ON a.id=c.article_id
         ");
-        $actual = $ArticlesTable->fromNativeQuery($stmt)->all();
+        $actual = $ArticlesTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(Article::class, $actual[0]);
         $actualComments = $actual[0]->get('comments');
@@ -315,7 +315,7 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\CommentsTable $CommentsTable */
         $CommentsTable = $this->fetchTable(CommentsTable::class);
-        $stmt = $CommentsTable->prepareSQL("
+        $stmt = $CommentsTable->prepareNativeStatement("
             SELECT
                 Comments.id         AS Comments__id,
                 Comments.article_id AS Comments__article_id,
@@ -326,7 +326,7 @@ class NativeQueryMapperTest extends TestCase
             LEFT JOIN articles AS Articles
                 ON Articles.id=Comments.article_id
         ");
-        $actual = $CommentsTable->fromNativeQuery($stmt)->all();
+        $actual = $CommentsTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(Comment::class, $actual[0]);
         static::assertInstanceOf(Article::class, $actual[0]->get('article'));
@@ -356,7 +356,7 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\CommentsTable $CommentsTable */
         $CommentsTable = $this->fetchTable(CommentsTable::class);
-        $stmt = $CommentsTable->prepareSQL("
+        $stmt = $CommentsTable->prepareNativeStatement("
             SELECT
                 article_id AS Comments__article_id,
                 content    AS Comments__content,
@@ -365,7 +365,7 @@ class NativeQueryMapperTest extends TestCase
             LEFT JOIN articles
                 ON articles.id=comments.article_id
         ");
-        $actual = $CommentsTable->fromNativeQuery($stmt)->all();
+        $actual = $CommentsTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(Comment::class, $actual[0]);
         static::assertInstanceOf(Article::class, $actual[0]->get('article'));
@@ -393,7 +393,7 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\CommentsTable $CommentsTable */
         $CommentsTable = $this->fetchTable(CommentsTable::class);
-        $stmt = $CommentsTable->prepareSQL("
+        $stmt = $CommentsTable->prepareNativeStatement("
             SELECT
                 c.id        AS Comments__id,
                 article_id  AS Comments__article_id,
@@ -404,7 +404,7 @@ class NativeQueryMapperTest extends TestCase
             LEFT JOIN articles AS a
                 ON a.id=c.article_id
         ");
-        $actual = $CommentsTable->fromNativeQuery($stmt)->all();
+        $actual = $CommentsTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(Comment::class, $actual[0]);
         static::assertInstanceOf(Article::class, $actual[0]->get('article'));
@@ -434,7 +434,7 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\UsersTable $UsersTable */
         $UsersTable = $this->fetchTable(UsersTable::class);
-        $stmt = $UsersTable->prepareSQL("
+        $stmt = $UsersTable->prepareNativeStatement("
             SELECT
                 Users.id            AS Users__id,
                 Users.username      AS Users__username,
@@ -445,7 +445,7 @@ class NativeQueryMapperTest extends TestCase
             LEFT JOIN profiles AS Profiles
                 ON Users.id=Profiles.user_id
         ");
-        $actual = $UsersTable->fromNativeQuery($stmt)->all();
+        $actual = $UsersTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(User::class, $actual[0]);
         static::assertInstanceOf(Profile::class, $actual[0]->get('profile'));
@@ -476,7 +476,7 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\UsersTable $UsersTable */
         $UsersTable = $this->fetchTable(UsersTable::class);
-        $stmt = $UsersTable->prepareSQL("
+        $stmt = $UsersTable->prepareNativeStatement("
             SELECT
                 u.id        AS Users__id,
                 username    AS Users__username,
@@ -487,7 +487,7 @@ class NativeQueryMapperTest extends TestCase
             LEFT JOIN profiles AS p
                 ON u.id=p.user_id
         ");
-        $actual = $UsersTable->fromNativeQuery($stmt)->all();
+        $actual = $UsersTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(User::class, $actual[0]);
         static::assertInstanceOf(Profile::class, $actual[0]->get('profile'));
@@ -518,7 +518,7 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-        $stmt = $ArticlesTable->prepareSQL("
+        $stmt = $ArticlesTable->prepareNativeStatement("
             SELECT
                 Articles.id     AS Articles__id,
                 Articles.title  AS Articles__title,
@@ -530,7 +530,7 @@ class NativeQueryMapperTest extends TestCase
             LEFT JOIN tags AS Tags
                 ON Tags.id=ArticlesTags.tag_id
         ");
-        $actual = $ArticlesTable->fromNativeQuery($stmt)->all();
+        $actual = $ArticlesTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(Article::class, $actual[0]);
         $actualTags = $actual[0]->get('tags');
@@ -569,7 +569,7 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-        $stmt = $ArticlesTable->prepareSQL("
+        $stmt = $ArticlesTable->prepareNativeStatement("
             SELECT
                 a.id    AS Articles__id,
                 title   AS Articles__title,
@@ -581,7 +581,7 @@ class NativeQueryMapperTest extends TestCase
             LEFT JOIN tags AS t
                 ON t.id=at.tag_id
         ");
-        $actual = $ArticlesTable->fromNativeQuery($stmt)->all();
+        $actual = $ArticlesTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(Article::class, $actual[0]);
         $actualTags = $actual[0]->get('tags');
@@ -620,7 +620,7 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-        $stmt = $ArticlesTable->prepareSQL("
+        $stmt = $ArticlesTable->prepareNativeStatement("
             SELECT
                 Articles.id             AS Articles__id,
                 Articles.title          AS Articles__title,
@@ -635,7 +635,7 @@ class NativeQueryMapperTest extends TestCase
             LEFT JOIN tags AS Tags
                 ON Tags.id=ArticlesTags.tag_id
         ");
-        $actual = $ArticlesTable->fromNativeQuery($stmt)->all();
+        $actual = $ArticlesTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(Article::class, $actual[0]);
         $actualTags = $actual[0]->get('tags');
@@ -687,7 +687,7 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
         $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-        $stmt = $ArticlesTable->prepareSQL("
+        $stmt = $ArticlesTable->prepareNativeStatement("
             SELECT
                 a.id        AS Articles__id,
                 title       AS Articles__title,
@@ -702,7 +702,7 @@ class NativeQueryMapperTest extends TestCase
             LEFT JOIN tags AS t
                 ON t.id=at.tag_id
         ");
-        $actual = $ArticlesTable->fromNativeQuery($stmt)->all();
+        $actual = $ArticlesTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(Article::class, $actual[0]);
         $actualTags = $actual[0]->get('tags');
@@ -754,7 +754,7 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\CountriesTable $CountriesTable */
         $CountriesTable = $this->fetchTable(CountriesTable::class);
-        $stmt = $CountriesTable->prepareSQL("
+        $stmt = $CountriesTable->prepareNativeStatement("
             SELECT
                 Countries.id            AS Countries__id,
                 Countries.name          AS Countries__name,
@@ -783,7 +783,7 @@ class NativeQueryMapperTest extends TestCase
             LEFT JOIN comments AS Comments
                 ON Comments.article_id=Articles.id
         ");
-        $actual = $CountriesTable->fromNativeQuery($stmt)->all();
+        $actual = $CountriesTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(Country::class, $actual[0]);
         $actualUsers = $actual[0]->get('users');
@@ -857,7 +857,7 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\CountriesTable $CountriesTable */
         $CountriesTable = $this->fetchTable(CountriesTable::class);
-        $stmt = $CountriesTable->prepareSQL("
+        $stmt = $CountriesTable->prepareNativeStatement("
             SELECT
                 c.id            AS Countries__id,
                 c.name          AS Countries__name,
@@ -886,7 +886,7 @@ class NativeQueryMapperTest extends TestCase
             LEFT JOIN comments AS cm
                 ON cm.article_id=a.id
         ");
-        $actual = $CountriesTable->fromNativeQuery($stmt)->all();
+        $actual = $CountriesTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(Country::class, $actual[0]);
         $actualUsers = $actual[0]->get('users');
@@ -960,7 +960,7 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\CountriesTable $CountriesTable */
         $CountriesTable = $this->fetchTable(CountriesTable::class);
-        $stmt = $CountriesTable->prepareSQL("
+        $stmt = $CountriesTable->prepareNativeStatement("
             SELECT
                 Countries.id            AS Countries__id,
                 Countries.name          AS Countries__name,
@@ -991,7 +991,7 @@ class NativeQueryMapperTest extends TestCase
             LEFT JOIN comments AS Comments
                 ON Comments.article_id=Articles.id
         ");
-        $actual = $CountriesTable->fromNativeQuery($stmt)->all();
+        $actual = $CountriesTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(Country::class, $actual[0]);
         $actualUsers = $actual[0]->get('users');
@@ -1095,7 +1095,7 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\CountriesTable $CountriesTable */
         $CountriesTable = $this->fetchTable(CountriesTable::class);
-        $stmt = $CountriesTable->prepareSQL("
+        $stmt = $CountriesTable->prepareNativeStatement("
             SELECT
                 c.id            AS Countries__id,
                 c.name          AS Countries__name,
@@ -1126,7 +1126,7 @@ class NativeQueryMapperTest extends TestCase
             LEFT JOIN comments AS cm
                 ON cm.article_id=a.id
         ");
-        $actual = $CountriesTable->fromNativeQuery($stmt)->all();
+        $actual = $CountriesTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(Country::class, $actual[0]);
         $actualUsers = $actual[0]->get('users');
@@ -1230,14 +1230,14 @@ class NativeQueryMapperTest extends TestCase
     {
         /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\CommentsTable $CommentsTable */
         $CommentsTable = $this->fetchTable(CommentsTable::class);
-        $stmt = $CommentsTable->prepareSQL("
+        $stmt = $CommentsTable->prepareNativeStatement("
             SELECT
                 id         AS Comments__id,
                 content    AS Comments__content,
                 created    AS Comments__created
             FROM comments
         ");
-        $actual = $CommentsTable->fromNativeQuery($stmt)->all();
+        $actual = $CommentsTable->mapNativeStatement($stmt)->all();
         static::assertCount(5, $actual);
         static::assertInstanceOf(Comment::class, $actual[0]);
         $expected = [

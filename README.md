@@ -63,7 +63,7 @@ use NativeSQLMapperTrait;
 
 ```php
 $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-$stmt = $ArticlesTable->prepareSQL("
+$stmt = $ArticlesTable->prepareNativeStatement("
     SELECT
         id     AS Articles__id,
         title  AS Articles__title
@@ -72,7 +72,7 @@ $stmt = $ArticlesTable->prepareSQL("
 ");
 $stmt->bindValue('title', 'My Article Title');
 /** @var \App\Model\Entity\Article[] $entities */
-$entities = $ArticlesTable->fromNativeQuery($stmt)->all();
+$entities = $ArticlesTable->mapNativeStatement($stmt)->all();
 ```
 
 `$entities` now contains hydrated `Article` entities based on the SQL result.
@@ -82,7 +82,7 @@ $entities = $ArticlesTable->fromNativeQuery($stmt)->all();
 ## 🔁 hasMany Example Using Minimalistic SQL
 
 ```php
-$stmt = $ArticlesTable->prepareSQL("
+$stmt = $ArticlesTable->prepareNativeStatement("
     SELECT
         a.id        AS Articles__id,
         title       AS Articles__title,
@@ -93,7 +93,7 @@ $stmt = $ArticlesTable->prepareSQL("
     LEFT JOIN comments AS c
         ON a.id=c.article_id
 ");
-$entities = $ArticlesTable->fromNativeQuery($stmt)->all();
+$entities = $ArticlesTable->mapNativeStatement($stmt)->all();
 ```
 `$entities` now contains an array of Article objects with Comment objects as children.
 
@@ -114,7 +114,7 @@ Notice that `FROM` and `JOIN` clauses may use short or long aliases or no aliase
 
 ```php
 $ArticlesTable = $this->fetchTable(ArticlesTable::class);
-$stmt = $ArticlesTable->prepareSQL("
+$stmt = $ArticlesTable->prepareNativeStatement("
     SELECT
         Articles.id     AS Articles__id,
         Articles.title  AS Articles__title,
@@ -126,7 +126,7 @@ $stmt = $ArticlesTable->prepareSQL("
     LEFT JOIN tags AS Tags
         ON Tags.id=ArticlesTags.tag_id
 ");
-$entities = $ArticlesTable->fromNativeQuery($stmt)->all();
+$entities = $ArticlesTable->mapNativeStatement($stmt)->all();
 ```
 You can find more examples in tests - https://github.com/bancer/native-sql-mapper/tree/develop/tests/TestCase/ORM.
 
