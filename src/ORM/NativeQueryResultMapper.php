@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Bancer\NativeQueryMapper\ORM;
 
 use Cake\Database\StatementInterface;
+use Cake\Datasource\EntityInterface;
 use Cake\ORM\Table;
 
 /**
@@ -102,6 +103,23 @@ class NativeQueryResultMapper
         }
         $hydrator = new RecursiveEntityHydrator($this->rootTable, $this->mapStrategy, $aliasMap);
         return $hydrator->hydrateMany($rows);
+    }
+
+    /**
+     * Returns the first hydrated entity from the native query result.
+     *
+     * This executes the native SQL, hydrates entities using the mapping strategy,
+     * and returns only the first entity (or null if no rows were returned).
+     *
+     * @return \Cake\Datasource\EntityInterface|null
+     */
+    public function first(): ?EntityInterface
+    {
+        $entities = $this->all();
+        if ($entities === []) {
+            return null;
+        }
+        return $entities[0];
     }
 
     /**
