@@ -42,6 +42,13 @@ class AutoHydratorRecursive
     protected array $entitiesMap = [];
 
     /**
+     * The map of aliases and corresponding Table objects.
+     *
+     * @var array<string,\Cake\ORM\Table|null>
+     */
+    protected array $aliasMap = [];
+
+    /**
      * @var \Cake\Datasource\EntityInterface[]
      */
     protected array $entities = [];
@@ -56,11 +63,13 @@ class AutoHydratorRecursive
     /**
      * @param \Cake\ORM\Table $rootTable
      * @param mixed[] $mappingStrategy Mapping strategy.
+     * @param array<string,\Cake\ORM\Table> $aliasMap Aliases and corresponding Table objects.
      */
-    public function __construct(Table $rootTable, array $mappingStrategy)
+    public function __construct(Table $rootTable, array $mappingStrategy, array $aliasMap)
     {
         $this->rootTable = $rootTable;
         $this->mappingStrategy = $mappingStrategy;
+        $this->aliasMap = $aliasMap;
     }
 
     /**
@@ -214,6 +223,17 @@ class AutoHydratorRecursive
                     throw new MissingColumnException($message);
                 }
             }
+        }
+        if (isset($this->aliasMap[$alias])) {
+            /** @var \Cake\ORM\Table $Table */
+            $Table = $this->aliasMap[$alias];
+            $options = [
+                'validate' => false,
+            ];
+            $entity = $Table->marshaller()->one($fields, $options);
+            $entity->clean();
+            $entity->setNew(false);
+            return $entity;
         }
         $options = [
             'markClean' => true,

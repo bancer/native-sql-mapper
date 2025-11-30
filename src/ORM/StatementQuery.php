@@ -52,12 +52,14 @@ class StatementQuery
         if (!$rows) {
             return [];
         }
+        $aliasMap = [];
         if ($this->mapStrategy === null) {
             $aliases = $this->extractAliases($rows);
             $strategy = new MappingStrategy($this->rootTable, $aliases);
             $this->mapStrategy = $strategy->build()->toArray();
+            $aliasMap = $strategy->getAliasMap();
         }
-        $hydrator = new AutoHydratorRecursive($this->rootTable, $this->mapStrategy);
+        $hydrator = new AutoHydratorRecursive($this->rootTable, $this->mapStrategy, $aliasMap);
         return $hydrator->hydrateMany($rows);
     }
 

@@ -21,5 +21,6 @@ class CommentsTable extends Table
         parent::initialize($config);
         $this->belongsTo('Articles', ['className' => ArticlesTable::class]);
         $this->belongsTo('Users', ['className' => UsersTable::class]);
+        $this->addBehavior('Timestamp');
     }
 }
