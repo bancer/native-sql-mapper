@@ -307,8 +307,57 @@ class NativeQueryMapperTest extends TestCase
                 ],
             ])
             ->toArray();
-        $this->assertEqualsEntities($cakeEntities, $actual);
-        //static::assertEquals($cakeEntities, $actual);
+        static::assertEquals($cakeEntities, $actual);
+    }
+
+    public function testHasManyFirst(): void
+    {
+        /** @var \Bancer\NativeQueryMapperTest\TestApp\Model\Table\ArticlesTable $ArticlesTable */
+        $ArticlesTable = $this->fetchTable(ArticlesTable::class);
+        $stmt = $ArticlesTable->prepareNativeStatement("
+            SELECT
+                a.id        AS Articles__id,
+                title       AS Articles__title,
+                c.id        AS Comments__id,
+                article_id  AS Comments__article_id,
+                content     AS Comments__content
+            FROM articles AS a
+            LEFT JOIN comments AS c ON a.id=c.article_id
+            WHERE a.id=1
+        ");
+        $actual = $ArticlesTable->mapNativeStatement($stmt)->first();
+        static::assertInstanceOf(Article::class, $actual);
+        $actualComments = $actual->get('comments');
+        static::assertIsArray($actualComments);
+        static::assertCount(2, $actualComments);
+        static::assertInstanceOf(Comment::class, $actualComments[0]);
+        $expected = [
+            'id' => 1,
+            'title' => 'Article 1',
+            'comments' => [
+                [
+                    'id' => 1,
+                    'article_id' => 1,
+                    'content' => 'Comment 1',
+                ],
+                [
+                    'id' => 2,
+                    'article_id' => 1,
+                    'content' => 'Comment 2',
+                ],
+            ],
+        ];
+        static::assertEquals($expected, $actual->toArray());
+        $cakeEntity = $ArticlesTable->find()
+            ->select(['Articles.id', 'Articles.title'])
+            ->contain([
+                'Comments' => [
+                    'fields' => ['Comments.id', 'Comments.article_id', 'Comments.content'],
+                ],
+            ])
+            ->where(['Articles.id' => 1])
+            ->first();
+        static::assertEquals($cakeEntity, $actual);
     }
 
     public function testBelongsTo(): void
