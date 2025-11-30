@@ -100,7 +100,7 @@ class NativeQueryResultMapper
             $this->mapStrategy = $strategy->build()->toArray();
             $aliasMap = $strategy->getAliasMap();
         }
-        $hydrator = new AutoHydratorRecursive($this->rootTable, $this->mapStrategy, $aliasMap);
+        $hydrator = new RecursiveEntityHydrator($this->rootTable, $this->mapStrategy, $aliasMap);
         return $hydrator->hydrateMany($rows);
     }
 
