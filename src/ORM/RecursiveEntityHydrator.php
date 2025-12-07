@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace Bancer\NativeQueryMapper\ORM;
 
 use Cake\ORM\Table;
+use Cake\Database\Connection;
+use Cake\Database\FieldTypeConverter;
+use Cake\Database\TypeFactory;
+use Cake\Database\TypeInterface;
+use Cake\Database\TypeMap;
 use Cake\Datasource\EntityInterface;
 use Cake\Utility\Hash;
 use RuntimeException;
@@ -73,6 +78,22 @@ class RecursiveEntityHydrator
      * @var \Cake\Datasource\EntityInterface[]
      */
     protected array $entities = [];
+
+    /**
+     * Resolved column type objects indexed by alias and column name.
+     *
+     * Structure:
+     * [
+     *     '{alias}' => [
+     *         '{column}' => \Cake\Database\TypeInterface|null
+     *     ]
+     * ]
+     *
+     * A null value indicates that the column exists but has no resolvable type.
+     *
+     * @var array<string, array<string, \Cake\Database\TypeInterface|null>>
+     */
+    protected array $columnTypes = [];
 
     /**
      * Whether the presence of primary keys is mandatory for all entities,
@@ -213,17 +234,23 @@ class RecursiveEntityHydrator
     }
 
     /**
-     * Create an entity from raw field data using either:
-     *  - Table marshaller (preferred), or
-     *  - direct entity instantiation (fallback).
+     * Constructs an entity instance from raw database fields.
      *
-     * Returns null when the row for the alias is "empty" (all NULL fields).
+     * This method:
+     *  - Skips hydration when all fields are NULL (LEFT JOIN safety)
+     *  - Enforces presence of primary keys when required by mapping strategy
+     *  - Converts database values to PHP values using table schema types
+     *  - Instantiates the entity in a "persisted & clean" state
      *
      * @param class-string<\Cake\Datasource\EntityInterface> $className Entity class.
-     * @param mixed[] $fields Raw database fields.
+     * @param mixed[] $fields Raw database fields (alias stripped).
      * @param string $alias Alias of the entity.
-     * @param string[]|string|null $primaryKey Primary key name(s).
-     * @return \Cake\Datasource\EntityInterface|null
+     * @param string[]|string|null $primaryKey Primary key column name(s), if required.
+     * @throws \RuntimeException When primary keys are required but not configured.
+     * @throws \Bancer\NativeQueryMapper\ORM\MissingColumnException When required primary key columns are missing
+     *      from the result set.
+     * @return \Cake\Datasource\EntityInterface|null Fully hydrated entity,
+     *      or null when the row contains only NULL values.
      */
     protected function constructEntity(
         string $className,
@@ -258,22 +285,86 @@ class RecursiveEntityHydrator
                 }
             }
         }
-        if (isset($this->aliasMap[$alias])) {
-            /** @var \Cake\ORM\Table $Table */
-            $Table = $this->aliasMap[$alias];
-            $options = [
-                'validate' => false,
-            ];
-            $entity = $Table->marshaller()->one($fields, $options);
-            $entity->clean();
-            $entity->setNew(false);
-            return $entity;
-        }
         $options = [
             'markClean' => true,
             'markNew' => false,
         ];
+        if (isset($this->aliasMap[$alias])) {
+            /** @var \Cake\ORM\Table $Table */
+            $Table = $this->aliasMap[$alias];
+            $converted = $this->convertDatabaseTypesToPHP($alias, $fields);
+            $options += [
+                'source' => $Table->getRegistryAlias(),
+            ];
+            return new $className($converted, $options);
+        }
         return new $className($fields, $options);
+    }
+
+    /**
+     * Converts raw database values to PHP values using the table schema.
+     *
+     * Each column is converted using its corresponding database type.
+     *
+     * Column types are resolved lazily and cached per alias to avoid repeated
+     * schema lookups and type instantiation.
+     *
+     * @param string $alias Query alias identifying the table schema.
+     * @param mixed[] $fields Raw database field values indexed by column name.
+     * @return mixed[] Converted field values suitable for entity construction.
+     */
+    protected function convertDatabaseTypesToPHP(string $alias, array $fields): array
+    {
+        /** @var \Cake\ORM\Table $Table */
+        $Table = $this->aliasMap[$alias];
+        $driver = $Table->getConnection()->getDriver();
+        $converted = [];
+        foreach ($fields as $field => $value) {
+            if ($value === null) {
+                $converted[$field] = $value;
+                continue;
+            }
+            $type = $this->getColumnType($alias, $field);
+            if ($type !== null) {
+                $converted[$field] = $type->toPHP($value, $driver);
+            } else {
+                $converted[$field] = $value;
+            }
+        }
+        return $converted;
+    }
+
+    /**
+     * Resolves the database type for a given column.
+     *
+     * The column type is derived from the table schema associated with
+     * the provided alias. The resolved type instance is cached to a class field to avoid
+     * repeated schema access and object construction.
+     *
+     * @param string $alias Query alias used to resolve the table.
+     * @param string $columnName Column name within the table.
+     * @return \Cake\Database\TypeInterface|null
+     *         Type instance when resolvable, or null if the column does not exist
+     *         or has no associated type.
+     */
+    protected function getColumnType(string $alias, string $columnName): ?TypeInterface
+    {
+        if (
+            !array_key_exists($alias, $this->columnTypes) ||
+            !array_key_exists($columnName, $this->columnTypes[$alias])
+        ) {
+            $this->columnTypes[$alias][$columnName] = null;
+            /** @var \Cake\ORM\Table $Table */
+            $Table = $this->aliasMap[$alias];
+            $schema = $Table->getSchema();
+            if ($schema->hasColumn($columnName)) {
+                $typeName = $schema->getColumnType($columnName);
+                if ($typeName !== null) {
+                    $this->columnTypes[$alias][$columnName] = TypeFactory::build($typeName);
+                }
+            }
+        }
+        return $this->columnTypes[$alias][$columnName];
     }
 
     /**
