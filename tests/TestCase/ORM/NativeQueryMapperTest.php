@@ -161,8 +161,7 @@ class NativeQueryMapperTest extends TestCase
         $cakeEntities = $ArticlesTable->find()
             ->select(['id', 'title'])
             ->toArray();
-        $this->assertEqualsEntities($cakeEntities, $actual);
-        //static::assertEquals($cakeEntities, $actual);
+        static::assertEquals($cakeEntities, $actual);
     }
 
     public function testSimplestSelectMinimalSQL(): void
