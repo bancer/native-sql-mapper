@@ -142,6 +142,41 @@ You can find more examples in tests - https://github.com/bancer/native-sql-mappe
 
 ---
 
+## ➕ BONUS: IN() placeholder helper for native SQL
+
+When working with **native SQL queries** in CakePHP, PDO does not support binding arrays directly to `IN (…)` clauses. Each value must be expanded into its own placeholder and bound individually.
+
+The `InPlaceholders` class provides a small, explicit helper that removes this boilerplate while keeping native SQL fully transparent and predictable.
+
+##### What it does
+
+`InPlaceholders` is a **value object** that:
+
+- Generates named placeholders for use inside SQL `IN (…)` clauses
+- Binds all values to a prepared statement safely
+- Infers the correct PDO parameter type automatically (or accepts one explicitly)
+- Fails fast on invalid input (empty prefix or empty value list)
+
+There is **no ORM magic** involved — this works purely at the native SQL / PDO level.
+
+##### Basic example
+
+```php
+use Bancer\NativeQueryMapper\Database\InPlaceholders;
+
+$statuses = new InPlaceholders('status', [1, 5, 9]);
+$sql = <<<SQL
+    SELECT email as Users__email
+    FROM users
+    WHERE status_id IN ($statuses)
+SQL;
+$stmt = $this->prepareNativeStatement($sql);
+$statuses->bindValuesToStatement($stmt);
+$entities = $this->mapNativeStatement($stmt)->all();
+```
+
+---
+
 ## ⚠️ Requirements
 
 - Cake ORM **4.x** or **5.x** (or CakePHP **4.x** or **5.x**)
@@ -167,5 +202,3 @@ You can find more examples in tests - https://github.com/bancer/native-sql-mappe
 It fills the gap between raw PDO statements and the ORM — allowing complex SQL while preserving the integrity of your entity graphs.
 
 ---
-```
-
